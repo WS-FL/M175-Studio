@@ -1,0 +1,16 @@
+M175 Studio 0.2.2 - English revision
+
+1. Quit any running copy of M175 Studio.
+2. Move the entire M175 Studio.app to Applications, replacing the old copy if asked.
+3. Open it, enter your printer IP in Settings, and click Check Connection.
+4. Use the same local network as the HP LaserJet 100 colorMFP M175nw.
+
+macOS 12 or later. Apple Silicon and Intel binaries are included.
+No Python, Go, Xcode, Homebrew, VueScan or legacy HP driver is needed to run the app.
+Existing scanned documents and settings are preserved.
+New installations use Scan as the filename prefix; existing user preferences are kept.
+
+This is an independent beta, not an HP or Apple product. It has ad-hoc signatures,
+without Apple Developer ID signing or notarization. Keep system security enabled.
+Flatbed color 300 dpi was previously verified on hardware. The rebuilt English
+revision and other scan combinations still need real-printer testing.

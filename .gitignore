@@ -1,0 +1,9 @@
+.DS_Store
+mac-build/
+*.app/
+*.zip
+*.log
+settings.json
+ready.json
+__pycache__/
+build/

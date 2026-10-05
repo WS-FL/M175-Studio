@@ -1,28 +1,35 @@
 # M175 Studio
 
-自制 Mac 网络扫描应用，用于 HP LaserJet 100 colorMFP M175nw。通过局域网直连旧 HP 扫描接口，无需 VueScan 或旧版 HP Mac 驱动。独立应用提供扫描、文件、设置和诊断四个页面，扫描文件保存在本机。此项目与 HP、Apple 无关联，不代表官方支持。
+An independent Mac scanning app for the **HP LaserJet 100 colorMFP M175nw**. It connects directly to the printer's legacy scan interface over your local network, without VueScan or legacy HP Mac drivers. Scan, Files, Settings and Diagnostics are available in one window. Documents stay on your Mac.
 
-## 安装与使用
+M175 Studio is not affiliated with HP or Apple and does not claim official support.
 
-1. 从 Releases 下载 `M175_Studio_Mac_0.2.2.zip` 并解压。
-2. 退出旧版，将 `M175 Studio.app` 拖入「应用程序」；更新时选择替换。
-3. 打开应用，在「设置」填写扫描仪的局域网 IP（示例默认值 `192.168.5.44`，请改为自己的设备地址），端口默认 `8289`。
-4. 让 Mac 与打印机连接同一局域网，并在系统询问时允许访问本地网络。点击「检测连接」，放好原稿后扫描。
+## Install
 
-安装包包含 Apple Silicon 与 Intel 扫描引擎，应用要求 macOS 12 或更高版本。正常使用无需安装 Go、Python 或 Xcode。更新沿用现有扫描文件及设置。
+1. Download the English Mac ZIP from [Releases](https://github.com/WS-FL/M175-Studio/releases).
+2. Quit any running copy, unzip the download and move the entire **M175 Studio.app** to **Applications**. Replace the old app if prompted.
+3. Open the app. In **Settings**, enter your printer's local IP address. The example default is `192.168.5.44`; change it to your device's address. The default scan port is `8289`.
+4. Keep your Mac and printer on the same local network. Allow local network access when macOS asks, then click **Check Connection**.
+5. Place a document face down on the glass and click **Start Scan**.
 
-## 验证范围与限制
+Requires macOS 12 or later. The app includes Apple Silicon and Intel executables. Normal use does not require Go, Python, Xcode, Homebrew or Terminal. Existing settings and scanned documents are preserved. A filename prefix previously saved by the user is preserved; new installations default to `Scan`.
 
-平板彩色 300 dpi 网络扫描已在真实 M175nw 上完成验证。0.2.2 沿用已确认可用的 0.2.1 原生启动器，移除扫描页面顶部英文标签、宣传标题和说明；0.2.2 整包未再次进行真实 Mac 与打印机测试。ADF、其他分辨率与更多参数组合仍需实机验证，不能将模拟测试视为硬件验证。
+## Features and limitations
 
-这是测试版，未使用 Apple Developer ID 签名或 Apple 公证。若 macOS 阻止启动，请保留具体提示并检查来源和签名，不要关闭系统安全保护。没有 OCR、自动裁切或硬件双面扫描；其他 HP 型号的兼容性未经确认。
+- Flatbed and single-sided ADF controls; Letter and A4; 150, 200, 300 and 600 dpi options.
+- Color JPEG originals, combined PDFs, and optional local grayscale PDF conversion.
+- Scan history, page previews, persistent settings and diagnostic logs.
+- Flatbed color scanning at 300 dpi was previously verified on a real M175nw. ADF and other combinations still need hardware testing. Simulated printer tests are not evidence of ADF hardware compatibility.
+- The English revision rebuilds the available source using the real macOS SDK. Its scanner logic derives from the available 0.2.0 source snapshot. It preserves the compact scan header introduced in 0.2.2. It is not a byte-for-byte reconstruction of the earlier Chinese 0.2.2 package.
+- The app is ad-hoc signed, without Apple Developer ID signing or notarization. Review any macOS security message carefully; do not disable system security protections.
+- No OCR, automatic cropping or hardware duplex scanning. Other printer models are unverified.
 
-## 源码与构建
+All project documentation, app interface text and code comments are in English. User-authored filenames, document titles, saved preferences and operating-system messages can retain their original language.
 
-`native/` 是 AppKit/WKWebView 主程序；`engine/` 是 Go 扫描核心及内嵌界面；`tests/` 是界面测试工具。构建步骤见 [BUILD.md](BUILD.md)，历史验证记录见 [TESTING.md](TESTING.md)。
+## Build and verification
 
-**源码版本说明：**目前找回的源码标为 0.2.0。它不包含 0.2.1 原生启动修订和 0.2.2 界面修订，不能据此重现 0.2.2 安装包。保留原始版本号以避免误导。对应的完整修订源码尚未找回；Release 安装包本身已核对为 0.2.2。
+The English source used to build the English app has been prepared locally but has not been published yet. Publication of the reconstructed source requires explicit approval. In that source tree, `native/` contains the AppKit/WKWebView host, `engine/` the Go scan engine and embedded interface, and `tests/` the browser test harness. See [BUILD.md](BUILD.md) and [TESTING.md](TESTING.md).
 
-## 许可证与声明
+## License and third-party notices
 
-项目作者尚未指定开源许可证；公开源码不等于授予 MIT、Apache 或其他开源许可。第三方声明见 [NOTICE.txt](NOTICE.txt)，Go runtime 与标准库许可证保留在 [GO-LICENSE.txt](GO-LICENSE.txt)。
+No license has been specified for the project itself. Public source availability does not grant an MIT, Apache or other open-source license. Keep [NOTICE.txt](NOTICE.txt) and [GO-LICENSE.txt](GO-LICENSE.txt) with distributed builds. Go runtime and standard library license terms remain unchanged.

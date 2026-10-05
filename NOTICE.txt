@@ -1,0 +1,17 @@
+M175 Studio 0.2.2 - English revision
+Independent local-only scanning utility. Not affiliated with HP or Apple.
+
+Protocol reference: HPSimpleScan by sijisu
+https://gitlab.com/sijisu/hpsimplescan
+https://sijisu.eu/posts/writing-hpsimplescan/
+This is not an upstream release or an HP product.
+
+Go runtime and standard library: BSD license, see GO-LICENSE.txt.
+AppKit and WebKit are loaded from the user's macOS installation.
+No Apple framework binaries, SDK headers or third-party fonts are redistributed.
+No license has been specified for the project's own source code.
+
+The English app is rebuilt from recovered source using the real macOS SDK.
+Original Chinese 0.2.1/0.2.2 patch sources were not recovered. It is not a
+byte-for-byte reproduction of the earlier package. The flatbed scan core was
+previously verified at 300 dpi in color; ADF and other modes need hardware tests.
