@@ -1,7 +1,5 @@
 # Build on macOS
 
-The corresponding English source has been prepared locally and has not yet been published. These instructions describe the verified local build and will be usable after source publication.
-
 Requirements: macOS, Xcode Command Line Tools, Go 1.23.2 or a compatible version, and Python 3. The app targets macOS 12 and includes Apple Silicon and Intel executables.
 
 ```sh

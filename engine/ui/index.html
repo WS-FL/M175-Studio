@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>M175 Studio</title><link rel="stylesheet" href="style.css"><script src="app.js" defer></script></head>
+<body>
+<svg class="svg-defs" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><defs>
+<symbol id="i-scan" viewBox="0 0 24 24"><path d="M4 8V5a1 1 0 0 1 1-1h3m8 0h3a1 1 0 0 1 1 1v3M4 16v3a1 1 0 0 0 1 1h3m8 0h3a1 1 0 0 0 1-1v-3M3 12h18"/><path d="M8 8h8m-8 8h8"/></symbol>
+<symbol id="i-files" viewBox="0 0 24 24"><path d="M8 3h8l4 4v13a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/><path d="M16 3v5h4M4 6H3v13M11 12h5m-5 4h5"/></symbol>
+<symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 7h7m4 0h5M4 17h3m4 0h9"/><circle cx="13" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></symbol>
+<symbol id="i-log" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="m7 9 3 3-3 3m6 0h4"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+<symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-5-5 5 5-5 5"/></symbol>
+<symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 8a8 8 0 1 0 0 8m0-12v5h-5"/></symbol>
+<symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 8V5a1 1 0 0 1 1-1h5l2 3h9a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1Z"/></symbol>
+<symbol id="i-open" viewBox="0 0 24 24"><path d="M14 4h6v6m0-6L10 14M10 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-5"/></symbol>
+<symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3m-4 4v3"/></symbol>
+<symbol id="i-adf" viewBox="0 0 24 24"><path d="M6 11V4h12v7M4 10h16v10H4Zm4 4h8m-7 3h6"/></symbol>
+<symbol id="i-glass" viewBox="0 0 24 24"><path d="m4 10 14-6 2 7M3 12h18v7H3Zm3 4h2"/></symbol>
+<symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-11v1"/></symbol>
+</defs></svg>
+<div class="app-shell">
+<aside class="sidebar">
+  <div class="brand"><div class="brand-mark"><svg><use href="#i-scan"/></svg></div><div><strong>M175<span>Studio</span></strong><small>Local network scanning</small></div></div>
+  <div class="nav-label">Workspace</div>
+  <nav role="tablist" aria-label="Workspace tabs" aria-orientation="vertical">
+    <button class="nav-item active" id="tab-scan" role="tab" aria-selected="true" aria-controls="page-scan" data-tab="scan"><svg><use href="#i-scan"/></svg><span>Scan</span><kbd>⌘1</kbd></button>
+    <button class="nav-item" id="tab-files" role="tab" aria-selected="false" aria-controls="page-files" data-tab="files"><svg><use href="#i-files"/></svg><span>Files</span><span id="docCount" class="nav-count">0</span></button>
+    <button class="nav-item" id="tab-settings" role="tab" aria-selected="false" aria-controls="page-settings" data-tab="settings"><svg><use href="#i-settings"/></svg><span>Settings</span></button>
+    <button class="nav-item" id="tab-diagnostics" role="tab" aria-selected="false" aria-controls="page-diagnostics" data-tab="diagnostics"><svg><use href="#i-log"/></svg><span>Diagnostics</span></button>
+  </nav>
+  <div class="sidebar-bottom"><div class="device-mini"><span class="device-dot" id="sideDot"></span><div><strong>HP M175nw</strong><small id="sideIP">192.168.5.44</small></div></div><div class="privacy"><svg><use href="#i-lock"/></svg><span>Local processing - no uploads</span></div><div class="build">M175 Studio <span id="version">0.2.2 beta</span></div></div>
+</aside>
+<main>
+  <header class="page-header scan-header"><div><div class="eyebrow" id="eyebrow">SCAN WORKSPACE</div><h1 id="pageTitle">Scan</h1><p id="pageSubtitle">Scan, preview and save from your M175nw.</p></div><div class="header-actions"><div class="connection-badge" id="connectionBadge"><span class="device-dot" id="headerDot"></span><span id="connectionText">Not checked</span></div><button class="button compact" id="headerCheck"><svg><use href="#i-refresh"/></svg>Check Connection</button></div></header>
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+  <section id="page-scan" class="page active" role="tabpanel" aria-labelledby="tab-scan">
+    <div class="scan-layout">
+      <div class="scan-controls panel">
+        <div class="section-heading"><h2>Scan Settings</h2><span class="micro-label">New document</span></div>
+        <div class="field"><span class="field-label">Source</span><div class="source-switch" role="group" aria-label="Source"><button data-source="platen" class="selected"><svg><use href="#i-glass"/></svg><span>Flatbed</span></button><button data-source="adf"><svg><use href="#i-adf"/></svg><span>Document Feeder</span></button></div><p class="help" id="sourceHelp">Place the document face down on the glass.</p></div>
+        <div class="field"><label for="prefix">Filename Prefix</label><input id="prefix" value="Scan" maxlength="60" autocomplete="off"><p class="help">A timestamp is added; existing files are never overwritten.</p></div>
+        <div class="two-fields"><div class="field"><label for="paper">Paper Size</label><select id="paper"><option value="Letter">US Letter</option><option value="A4">A4</option></select></div><div class="field"><label for="dpi">Resolution</label><select id="dpi"><option value="150">150 dpi</option><option value="200">200 dpi</option><option value="300" selected>300 dpi</option><option value="600">600 dpi</option></select></div></div>
+        <p class="help advanced-warning hidden" id="dpiWarning">300 dpi has been tested on hardware; other resolutions need testing.</p>
+        <div class="field"><label for="mode">Color Mode</label><select id="mode"><option value="color">Color</option><option value="gray">Grayscale PDF</option></select></div>
+        <div class="field"><label for="format">File Format</label><select id="format"><option value="pdf">PDF + original JPEGs</option><option value="jpeg">Original JPEGs only</option></select><p class="help" id="formatHelp">Combine pages into one PDF; original images are always kept.</p></div>
+        <div class="save-destination"><svg><use href="#i-folder"/></svg><div><small>Save to</small><span id="outputShort">Pictures / M175 Scans</span></div><button class="text-button" id="changeOutput">Change</button></div>
+        <div class="scan-start-area"><button class="button primary" id="startScan"><svg><use href="#i-scan"/></svg><span>Start Scan</span><kbd>⌘↵</kbd></button><button class="button danger hidden" id="stopScan">Stop Receiving</button><p class="quiet-note" id="scanFootnote">Flatbed color at 300 dpi has been tested on hardware.</p></div>
+      </div>
+      <div id="scanPreviewMount" class="preview-mount"></div>
+    </div>
+  </section>
+  <section id="page-files" class="page" role="tabpanel" aria-labelledby="tab-files" hidden>
+    <div class="files-layout"><div class="document-panel panel"><div class="section-heading"><h2>Scan History</h2><button class="icon-button" id="refreshFiles" title="Refresh Scan History" aria-label="Refresh Scan History"><svg><use href="#i-refresh"/></svg></button></div><input class="search" id="fileSearch" placeholder="Search documents..." aria-label="Search scan history"><div id="documentList" class="document-list"></div><div class="document-footer"><span>Showing the latest 200 scans</span><button class="text-button" id="openOutput">Open Folder</button></div></div><div id="filesPreviewMount" class="preview-mount"></div></div>
+  </section>
+  <section id="page-settings" class="page" role="tabpanel" aria-labelledby="tab-settings" hidden>
+    <div class="settings-grid">
+      <div class="panel settings-panel"><div class="section-heading"><h2>Scanner Connection</h2><span class="tag">Direct LAN connection</span></div><p class="section-description">Uses the legacy M175nw scan interface without changing AirPrint settings.</p><div class="connection-fields"><div class="field"><label for="settingIP">Printer IP</label><input id="settingIP" value="192.168.5.44" spellcheck="false" inputmode="decimal"></div><div class="field"><label for="settingPort">Port</label><input id="settingPort" type="number" min="1" max="65535" value="8289"></div></div><div class="inline-note"><svg><use href="#i-info"/></svg><p>Your Mac and printer must be on the same local network. Allow M175 Studio to access the local network when prompted.</p></div><button class="button" id="settingsCheck"><svg><use href="#i-refresh"/></svg>Save and Check Connection</button></div>
+      <div class="panel settings-panel"><div class="section-heading"><h2>File Storage</h2><svg class="heading-icon"><use href="#i-folder"/></svg></div><p class="section-description">Each scan gets a separate folder containing original images, PDF and diagnostic logs. No cloud uploads.</p><div class="field"><label for="settingOutput">Output Folder</label><input id="settingOutput" spellcheck="false"><p class="help">Uses Pictures/M175 Scans by default. Existing scans appear in Files.</p></div><button class="button" id="chooseFolder"><svg><use href="#i-folder"/></svg>Choose Folder…</button></div>
+      <div class="panel settings-panel wide"><div class="section-heading"><h2>App and Privacy</h2><span class="tag">Standalone app</span></div><div class="about-row"><div><strong>No separate launcher required</strong><p>The app includes its scan engine and interface. Move it to Applications; no Python, Go, Homebrew, HP driver or Terminal is required.</p></div><div><strong>Documents stay on this Mac</strong><p>The interface uses a local loopback connection. Scan data comes directly from the local network device you specify. No cloud upload, telemetry or account login.</p></div></div><div class="notice">Independent beta, not an HP product and not Apple-notarized. The flatbed color 300 dpi scan core has been tested on hardware. This English build, ADF and other resolutions need hardware testing. No OCR, automatic cropping or hardware duplex scanning.</div></div>
+    </div><div class="settings-actions"><span id="saveSettingsMessage">Save changes to keep them for the next launch.</span><button class="button primary" id="saveSettings"><svg><use href="#i-check"/></svg>Save Settings</button></div>
+  </section>
+  <section id="page-diagnostics" class="page" role="tabpanel" aria-labelledby="tab-diagnostics" hidden>
+    <div class="diag-summary"><div class="panel diagnostic-card"><small>Scanner Status</small><strong id="diagScannerState">Not read</strong><span id="diagChecked">Click Check Connection to read status</span></div><div class="panel diagnostic-card"><small>Document Feeder</small><strong id="diagADF">Not read</strong><span>Flatbed scanning does not require paper in the feeder</span></div><div class="panel diagnostic-card"><small>Current Job</small><strong id="diagJob">No active job</strong><span id="diagPages">Received 0 pages</span></div></div>
+    <div class="panel log-panel"><div class="section-heading"><h2>Job Log</h2><div class="button-row"><button class="button compact" id="copyLog"><svg><use href="#i-copy"/></svg>Copy</button><button class="button compact" id="openLog"><svg><use href="#i-folder"/></svg>Log Folder</button></div></div><pre id="logText" tabindex="0">No logs yet. Connection checks and scan activity appear here.</pre></div>
+    <div class="permission-note"><svg><use href="#i-info"/></svg><div><strong>Seeing "no route to host"?</strong><p>Check M175 Studio in System Settings > Privacy & Security > Local Network. Also check the IP, Wi-Fi and VPN; this error alone cannot identify the cause.</p></div><button class="button" id="openPrivacy">Open Privacy Settings</button></div>
+  </section>
+  <footer class="task-bar" aria-live="polite"><div class="task-status"><span id="taskIndicator" class="task-indicator"></span><span id="taskMessage">Place your document to begin</span></div><div class="task-meta"><span id="taskTime"></span><button class="text-button hidden" id="viewDiagnostics">View Details</button></div></footer>
+</main>
+</div>
+<div class="panel preview-panel" id="previewPanel">
+  <div class="preview-toolbar"><div><h2 id="previewTitle">Page Preview</h2><span id="previewMeta">Available after scanning</span></div><div class="preview-actions"><select id="zoom" aria-label="Preview zoom"><option value="fit">Fit to Window</option><option value="100">100%</option><option value="150">150%</option></select><button class="icon-button" id="rotatePreview" title="Rotate preview without changing saved files" aria-label="Rotate preview"><svg><use href="#i-refresh"/></svg></button></div></div>
+  <div class="preview-canvas" id="previewCanvas"><div class="preview-empty" id="previewEmpty"><div class="paper-illustration"><div class="paper-line l1"></div><div class="paper-line l2"></div><div class="paper-line l3"></div><div class="scan-line"></div><svg><use href="#i-scan"/></svg></div><h3>No preview yet</h3><p>Preview pages here after scanning.<br>Saved documents are also available in Files.</p></div><img id="previewImage" alt="Scanned page preview" class="hidden" draggable="false"></div>
+  <div class="preview-error hidden" id="previewError" role="alert"><strong id="previewErrorTitle"></strong><p id="previewErrorHint"></p><button class="text-button" id="errorDetails">View Diagnostic Log <span>→</span></button></div>
+  <div class="preview-bottom"><div class="pagination"><button class="icon-button" id="prevPage" aria-label="Previous page">‹</button><span id="pageNumber">0 / 0</span><button class="icon-button" id="nextPage" aria-label="Next page">›</button></div><div class="button-row"><button class="button compact" id="revealFile"><svg><use href="#i-folder"/></svg>Finder</button><button class="button compact" id="openPDF"><svg><use href="#i-open"/></svg>Open PDF</button></div></div>
+</div>
+</body></html>

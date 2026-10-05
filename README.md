@@ -28,7 +28,7 @@ All project documentation, app interface text and code comments are in English. 
 
 ## Build and verification
 
-The English source used to build the English app has been prepared locally but has not been published yet. Publication of the reconstructed source requires explicit approval. In that source tree, `native/` contains the AppKit/WKWebView host, `engine/` the Go scan engine and embedded interface, and `tests/` the browser test harness. See [BUILD.md](BUILD.md) and [TESTING.md](TESTING.md).
+The English source used to build the English app is included: `native/` contains the AppKit/WKWebView host, `engine/` the Go scan engine and embedded interface, and `tests/` the browser test harness. See [BUILD.md](BUILD.md) and [TESTING.md](TESTING.md).
 
 ## License and third-party notices
 
