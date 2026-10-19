@@ -86,6 +86,8 @@ type appServer struct {
 	settings             Settings
 	docs                 []Document
 	job                  Job
+	discoveryCancel      context.CancelFunc
+	discovery            Discovery
 	connection           Connection
 	cancel               context.CancelFunc
 	support, token, host string
@@ -195,6 +197,7 @@ func listDocuments(root string) []Document {
 			continue
 		}
 		dir := filepath.Join(root, entry.Name())
+		preferredPDF := ""
 		pages, _ := filepath.Glob(filepath.Join(dir, "page-*.jpg"))
 		if len(pages) == 0 {
 			continue
@@ -209,6 +212,9 @@ func listDocuments(root string) []Document {
 			var m Document
 			if json.Unmarshal(b, &m) == nil {
 				doc.Title = m.Title
+				if filepath.Base(m.PDF) == m.PDF {
+					preferredPDF = m.PDF
+				}
 				doc.Created = m.Created
 				doc.DPI = m.DPI
 				doc.Source = m.Source
@@ -235,7 +241,15 @@ func listDocuments(root string) []Document {
 			continue
 		}
 		if pf, _ := filepath.Glob(filepath.Join(dir, "*.pdf")); len(pf) > 0 {
-			sort.Strings(pf)
+			sort.Slice(pf, func(i, j int) bool {
+				if filepath.Base(pf[i]) == preferredPDF {
+					return true
+				}
+				if filepath.Base(pf[j]) == preferredPDF {
+					return false
+				}
+				return pf[i] < pf[j]
+			})
 			for _, p := range pf {
 				if st, e := os.Lstat(p); e == nil && st.Mode().IsRegular() {
 					doc.PDF = filepath.Base(p)
@@ -271,7 +285,8 @@ func (a *appServer) snapshot() any {
 		Connection Connection `json:"connection"`
 		Documents  []Document `json:"documents"`
 		Arch       string     `json:"arch"`
-	}{version, a.settings, job, a.connection, docs, runtime.GOARCH}
+		Discovery  Discovery  `json:"discovery"`
+	}{version, a.settings, job, a.connection, docs, runtime.GOARCH, a.discovery}
 }
 func (a *appServer) Write(b []byte) (int, error) {
 	a.mu.Lock()
@@ -506,6 +521,44 @@ func (a *appServer) route(w http.ResponseWriter, r *http.Request) {
 	}
 	if r.Method == "POST" {
 		switch rel {
+		case "api/discover":
+			if e := a.discover(); e != nil {
+				fail(w, 409, e)
+				return
+			}
+			jsonOut(w, map[string]bool{"ok": true})
+			return
+		case "api/select-device":
+			var req struct {
+				IP   string `json:"ip"`
+				Port int    `json:"port"`
+			}
+			if e := decode(r, &req); e != nil {
+				fail(w, 400, e)
+				return
+			}
+			if e := a.selectDevice(req.IP, req.Port); e != nil {
+				fail(w, 409, e)
+				return
+			}
+			jsonOut(w, map[string]bool{"ok": true})
+			return
+		case "api/rename":
+			var req struct {
+				ID    string `json:"id"`
+				Title string `json:"title"`
+			}
+			if e := decode(r, &req); e != nil {
+				fail(w, 400, e)
+				return
+			}
+			doc, e := a.renameDocument(req.ID, req.Title)
+			if e != nil {
+				fail(w, 409, e)
+				return
+			}
+			jsonOut(w, doc)
+			return
 		case "api/settings":
 			var ss Settings
 			if e := decode(r, &ss); e != nil {
@@ -713,6 +766,7 @@ func main() {
 	supportFlag := flag.String("support-dir", "", "settings directory (testing override)")
 	watch := flag.Bool("watch-stdin", false, "exit when native parent closes its pipe")
 	ver := flag.Bool("version", false, "print version")
+	noDiscovery := flag.Bool("no-discovery", false, "disable LAN discovery for isolated UI tests")
 	flag.Parse()
 	if *ver {
 		fmt.Println("M175 Studio", version)
@@ -759,11 +813,17 @@ func main() {
 		if a.cancel != nil {
 			a.cancel()
 		}
+		if a.discoveryCancel != nil {
+			a.discoveryCancel()
+		}
 		a.mu.Unlock()
 		c, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
 		_ = server.Shutdown(c)
 	}()
+	if !*noDiscovery {
+		_ = a.discover()
+	}
 	url := "http://" + a.host + "/s/" + a.token + "/"
 	if *ready != "" {
 		if e = atomicJSON(*ready, map[string]string{"url": url, "version": version}); e != nil {

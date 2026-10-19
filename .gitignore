@@ -7,3 +7,4 @@ settings.json
 ready.json
 __pycache__/
 build/
+release/

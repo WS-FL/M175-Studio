@@ -26,11 +26,11 @@ import (
 	"time"
 )
 
-const version = "0.2.2 beta (English)"
+const version = "0.3.0 beta"
 const scanNS = "http://tempuri.org/wscn.xsd"
 const maxResponse = 128 << 20
 
-// Keep local defaults explicit; no discovery, cloud services, proxy, or listener.
+// Scan core uses explicit local endpoints; discovery lives in discovery.go.
 type config struct {
 	IP, Source, Paper, Output string
 	Mode, Format              string

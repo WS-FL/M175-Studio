@@ -1,8 +1,10 @@
-M175 Studio 0.2.2 - English revision
+M175 Studio 0.3.0 - English revision
 
 1. Quit any running copy of M175 Studio.
 2. Move the entire M175 Studio.app to Applications, replacing the old copy if asked.
-3. Open it, enter your printer IP in Settings, and click Check Connection.
+3. Open it and allow automatic discovery to finish. Select your scanner in the
+   lower-left device area, then click Check Connection. If needed, enter its IP
+   in Settings > Advanced / Manual Connection.
 4. Use the same local network as the HP LaserJet 100 colorMFP M175nw.
 
 macOS 12 or later. Apple Silicon and Intel binaries are included.
@@ -14,3 +16,8 @@ This is an independent beta, not an HP or Apple product. It has ad-hoc signature
 without Apple Developer ID signing or notarization. Keep system security enabled.
 Flatbed color 300 dpi was previously verified on hardware. The rebuilt English
 revision and other scan combinations still need real-printer testing.
+
+0.3.0: Automatic local scanner discovery starts at launch. Click the lower-left
+device area to select or refresh. Manual IP entry remains in Settings >
+Advanced / Manual Connection. Click the preview title to rename a document;
+Enter/click elsewhere saves, Escape cancels. See RELEASE_NOTES_0.3.0.md.

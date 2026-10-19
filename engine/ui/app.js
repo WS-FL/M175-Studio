@@ -1,5 +1,6 @@
 'use strict';
 const $ = id => document.getElementById(id);
+let editingTitle = null;
 let appState = null, initialized = false, currentTab = 'scan', source = 'platen';
 let selectedID = '', pageIndex = 0, rotation = 0, previewSignature = '', listSignature = '', lastCompleted = '';
 let requestBusy = false, toastTimer = 0, unavailableCount = 0, lastLog = '', chosenPath = '';
@@ -71,7 +72,9 @@ function renderPreview(){
   const doc=currentDocument();const has=Boolean(doc&&doc.pages.length);pageIndex=has?Math.max(0,Math.min(pageIndex,doc.pages.length-1)):0;
   const signature=JSON.stringify([doc?.id,pageIndex,rotation,$('zoom').value,has?doc.pages[pageIndex]:'']);
   $('previewEmpty').classList.toggle('hidden',has);$('previewImage').classList.toggle('hidden',!has);
-  $('previewTitle').textContent=has?doc.title:'Page Preview';$('previewTitle').title=has?doc.title:'';
+  $('previewTitle').textContent=has?doc.title:'Page Preview';$('previewTitle').title=has?'Click to rename · '+doc.title:'';
+  $('previewTitle').setAttribute('aria-disabled',String(!has||Boolean(appState?.job?.busy)));
+  $('previewTitle').classList.toggle('hidden',Boolean(editingTitle));
   $('previewMeta').textContent=has?doc.paper+' · '+doc.dpi+' dpi · '+(doc.mode==='gray'?'Grayscale':'Color')+' · '+sizeText(doc.bytes):'Available after scanning';
   $('pageNumber').textContent=has?(pageIndex+1)+' / '+doc.pages.length:'0 / 0';
   $('prevPage').disabled=!has||pageIndex===0;$('nextPage').disabled=!has||pageIndex>=doc.pages.length-1;
@@ -93,9 +96,10 @@ function updateElapsed(){
   $('taskTime').textContent=Number.isFinite(elapsed)?(elapsed<60?elapsed+' sec':Math.floor(elapsed/60)+' min '+elapsed%60+' sec'):'';
 }
 function renderState(s){
-  appState=s;if(!initialized){populateSettings(s.settings);initialized=true;if(s.documents.length)selectDocument(s.documents[0].id);}
+  const previous=appState;appState=s;if(previous&&currentTab!=='settings'&&(previous.settings.ip!==s.settings.ip||previous.settings.port!==s.settings.port)){ $('settingIP').value=s.settings.ip;$('settingPort').value=s.settings.port;}if(!initialized){populateSettings(s.settings);initialized=true;if(s.documents.length)selectDocument(s.documents[0].id);}
   $('version').textContent=s.version;$('sideIP').textContent=s.settings.ip;$('docCount').textContent=s.documents.length;
   $('outputShort').textContent=s.settings.output.replace(/^\/Users\/[^/]+\//,'').replaceAll('/',' / ');$('outputShort').title=s.settings.output;
+  renderDevices(s);
   const c=s.connection,online=c.status==='online';
   $('connectionText').textContent=online?'Last check successful':c.status==='error'?'Check connection':'Not checked';$('connectionBadge').title=c.checked?'Checked: '+formatDate(c.checked):'Scanner status has not been read';
   ['sideDot','headerDot'].forEach(id=>{$(id).classList.toggle('online',online);$(id).classList.toggle('error',c.status==='error');});
@@ -115,13 +119,50 @@ function renderState(s){
   renderFiles();renderPreview();updateElapsed();
 }
 async function poll(){try{const s=await api('state');unavailableCount=0;renderState(s);}catch(e){if(++unavailableCount===3){toast('Cannot reach the local scan service. Reopen the app; logs will be kept.',true);}}finally{setTimeout(poll,appState?.job?.busy?550:1700);}}
-async function save(quiet=false){await api('settings',settingsFromUI());const s=await api('state');renderState(s);if(!quiet)toast('Settings saved.');}
+async function save(quiet=false){const ss=settingsFromUI();if(currentTab!=='settings'&&appState){ss.ip=appState.settings.ip;ss.port=appState.settings.port;}await api('settings',ss);const s=await api('state');renderState(s);if(!quiet)toast('Settings saved.');}
 async function operate(kind){
   if(requestBusy||appState?.job?.busy)return;requestBusy=true;
   try{await save(true);native('busy',{busy:true});await api(kind,{});renderState(await api('state'));}catch(e){toast(e.message,true);}finally{requestBusy=false;if(appState)renderState(appState);}
 }
 async function openFile(action){try{await api('open',{action,id:selectedID});}catch(e){toast(e.message,true);}}
+
+function renderDevices(s){
+  const discovery=s.discovery||{},devices=discovery.devices||[];
+  const chosen=devices.find(d=>d.ip===s.settings.ip&&d.port===s.settings.port);
+  $('deviceName').textContent=chosen?.name||'Scanner';
+  $('sideIP').textContent=discovery.busy?'Searching…':s.connection.status==='online'?'Connected · '+s.settings.ip:devices.length?'No supported scanner connected':'No devices found';
+  $('discoveryMessage').textContent=discovery.busy?'Searching the local network…':discovery.message||'Use Refresh to search for scanners.';
+  const options=JSON.stringify([devices,s.settings.ip,s.settings.port]);
+  if($('deviceSelect').dataset.signature!==options){
+    $('deviceSelect').dataset.signature=options;$('deviceSelect').replaceChildren();
+    const placeholder=document.createElement('option');placeholder.textContent=devices.length?'Choose a scanner':'No devices found';placeholder.value='';$('deviceSelect').append(placeholder);
+    for(const d of devices){const option=document.createElement('option');option.value=JSON.stringify([d.ip,d.port]);option.textContent=d.name+' · '+d.ip+(d.supported?'':' — scanning not supported');option.disabled=!d.supported;option.selected=d.ip===s.settings.ip&&d.port===s.settings.port&&d.supported;$('deviceSelect').append(option);}
+  }
+  $('deviceSelect').disabled=Boolean(discovery.busy||s.job.busy);
+  $('discoverDevices').disabled=Boolean(discovery.busy||s.job.busy);
+}
+function beginRename(){
+  const doc=currentDocument();if(!doc||editingTitle||appState?.job?.busy)return;
+  editingTitle={id:doc.id,title:doc.title};$('titleEdit').value=doc.title;$('titleEdit').classList.remove('hidden');$('previewTitle').classList.add('hidden');$('titleEdit').focus();$('titleEdit').select();
+}
+async function finishRename(cancel=false){
+  if(!editingTitle)return;const edit=editingTitle,value=$('titleEdit').value;editingTitle=null;
+  $('titleEdit').classList.add('hidden');$('previewTitle').classList.remove('hidden');
+  if(cancel||value===edit.title){renderPreview();return;}
+  try{const doc=await api('rename',{id:edit.id,title:value});renderState(await api('state'));toast('Renamed to “'+doc.title+'”.');}
+  catch(e){toast('Rename failed: '+e.message,true);renderPreview();}
+}
 function bind(){
+  $('deviceToggle').addEventListener('click',()=>{const open=$('deviceMenu').classList.contains('hidden');$('deviceMenu').classList.toggle('hidden',!open);$('deviceToggle').setAttribute('aria-expanded',String(open));});
+  document.addEventListener('click',e=>{if(!e.target.closest('.device-picker')){$('deviceMenu').classList.add('hidden');$('deviceToggle').setAttribute('aria-expanded','false');}});
+  $('manualConnection').addEventListener('click',()=>{switchTab('settings');$('deviceMenu').classList.add('hidden');$('settingIP').focus();});
+  $('discoverDevices').addEventListener('click',async()=>{try{await api('discover',{});renderState(await api('state'));}catch(e){toast(e.message,true);}});
+  $('deviceSelect').addEventListener('change',async()=>{if(!$('deviceSelect').value)return;const [ip,port]=JSON.parse($('deviceSelect').value);try{await api('select-device',{ip,port});const s=await api('state');populateSettings(s.settings);renderState(s);toast('Scanner selected.');}catch(e){toast(e.message,true);}});
+  $('previewTitle').addEventListener('click',beginRename);
+  $('previewTitle').addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();beginRename();}});
+  $('titleEdit').addEventListener('keydown',e=>{if(e.isComposing)return;if(e.key==='Enter'||e.key==='Escape'){e.preventDefault();e.stopPropagation();finishRename(e.key==='Escape');}});
+  $('titleEdit').addEventListener('blur',()=>finishRename());
+
   document.querySelectorAll('[data-tab]').forEach(b=>b.addEventListener('click',()=>switchTab(b.dataset.tab)));
   document.querySelectorAll('[data-source]').forEach(b=>b.addEventListener('click',()=>{setSource(b.dataset.source);updateOptions();}));
   $('dpi').addEventListener('change',updateOptions);$('mode').addEventListener('change',updateOptions);$('format').addEventListener('change',updateOptions);

@@ -19,9 +19,9 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.2.2</string>
+	<string>0.3.0</string>
 	<key>CFBundleVersion</key>
-	<string>23</string>
+	<string>30</string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.productivity</string>
 	<key>LSMinimumSystemVersion</key>
@@ -40,8 +40,10 @@
 	<key>NSHumanReadableCopyright</key>
 	<string>Independent experimental utility. Not affiliated with HP or Apple. No cloud upload or telemetry.</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>M175 Studio connects to the HP M175nw scanner you specify on your local network. Scans are saved only on this Mac and are not uploaded.</string>
-	<key>NSRequiresAquaSystemAppearance</key>
+	<string>M175 Studio discovers printers and connects to your selected HP legacy scanner on your local network. Scans are saved only on this Mac and are not uploaded.</string>
+	<key>NSBonjourServices</key>
+<array><string>_scanner._tcp</string><string>_uscan._tcp</string><string>_uscans._tcp</string><string>_ipp._tcp</string><string>_ipps._tcp</string><string>_http._tcp</string><string>_pdl-datastream._tcp</string></array>
+<key>NSRequiresAquaSystemAppearance</key>
 	<true/>
 </dict>
 </plist>

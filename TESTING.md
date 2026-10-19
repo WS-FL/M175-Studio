@@ -16,3 +16,12 @@ The earlier scan core completed a real network flatbed color scan at 300 dpi on 
 ## Known limits
 
 A simulated printer cannot verify physical ADF feeding, scanner resolution support, sleep/wake behavior or real-printer reliability. Ad-hoc signature verification establishes integrity, not Apple trust or notarization. Intel runtime behavior requires an Intel Mac. Native startup checks do not establish successful scanning on a printer.
+
+
+## 0.3.0 feature tests
+
+Run `go test -race -count=1 ./...` in engine/ for protocol discovery, preferred reconnect, rename and scan regressions. The tests use temporary local HTTP services and isolated document fixtures; they do not contact a physical scanner.
+
+For the added UI harness, install Node and Playwright Chromium, build `build/m175-engine` from engine/, then run `node tests/features-ui.cjs` from the repository root. Playwright must be resolvable by Node (or NODE_PATH). Screenshots and the JSON report are written to ignored build/feature-ui/. Discovery states in the UI harness are explicit fixtures; HTTP/SOAP probes are exercised by the Go tests. `--no-discovery` is a test-only engine flag that prevents LAN traffic during isolated UI runs. Setting an absolute M175_STUDIO_TEST_ROOT for native host testing likewise isolates settings/logs and disables LAN discovery.
+
+Hardware acceptance still requires: grant/deny Local Network permission, find the real M175nw, remember it across relaunch, refresh after disconnect, scan flatbed color 300 dpi, and open/reveal a renamed PDF and its original JPEG pages. Verify Intel execution on an Intel Mac; cross-compilation and signature checks alone do not establish runtime compatibility.

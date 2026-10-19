@@ -104,7 +104,7 @@ static NSString *JSString(NSString *s){
     NSString *enginePath=[[[NSBundle mainBundle] resourcePath] stringByAppendingPathComponent:binary];
     engine=[[NSTask alloc] init];[engine setExecutableURL:[NSURL fileURLWithPath:enginePath]];
     NSMutableArray *arguments=[NSMutableArray arrayWithObjects:@"--ready-file",readyPath,@"--watch-stdin",nil];
-    if(testRoot){[arguments addObject:@"--support-dir"];[arguments addObject:[testRoot stringByAppendingPathComponent:@"support"]];}
+    if(testRoot){[arguments addObject:@"--no-discovery"];[arguments addObject:@"--support-dir"];[arguments addObject:[testRoot stringByAppendingPathComponent:@"support"]];}
     [engine setArguments:arguments];
     lifetimePipe=[[NSPipe pipe] retain];[engine setStandardInput:lifetimePipe];
     if(logHandle){[engine setStandardOutput:logHandle];[engine setStandardError:logHandle];}
