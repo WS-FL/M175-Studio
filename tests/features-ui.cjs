@@ -51,6 +51,30 @@ let stderr='';proc.stderr.on('data',b=>stderr+=b);let browser;
  await page.locator('#deviceSelect').selectOption(JSON.stringify(['192.168.5.45',8289]));await page.waitForFunction(()=>document.getElementById('sideIP').textContent.includes('192.168.5.45'));assert.equal(selected.ip,'192.168.5.45');
  await page.screenshot({path:path.join(shot,'03-device-picker.png')});
  await page.setViewportSize({width:960,height:665});assert(await page.evaluate(()=>document.documentElement.scrollWidth<=960));await page.screenshot({path:path.join(shot,'04-small-window.png')});
+
+ // Reproduce the reported sidebar overflow with real-length Bonjour names.
+ for(const name of ['HP LaserJet 100 colorMFP M175nw (ABC123)', '办公室 打印扫描一体机 · 中文设备名称很长也应正确显示', 'HP '+ 'Long-device-name-'.repeat(16)]){
+  discovery.devices[1].name=name;
+  await page.waitForFunction(name=>document.getElementById('deviceName').textContent===name,name);
+  assert.equal(await page.locator('#deviceName').getAttribute('title'),name);
+  assert((await page.locator('#deviceToggle').getAttribute('title')).includes(name));
+  for(const width of [1120,960]){
+   await page.setViewportSize({width,height:790});
+   const bounds=await page.evaluate(()=>{
+    const sidebar=document.querySelector('.sidebar').getBoundingClientRect();
+    const card=document.getElementById('deviceToggle').getBoundingClientRect();
+    const name=document.getElementById('deviceName'),n=name.getBoundingClientRect();
+    const arrow=document.querySelector('#deviceToggle>span:last-child').getBoundingClientRect();
+    return {sidebarRight:sidebar.right,cardRight:card.right,nameRight:n.right,arrowLeft:arrow.left,arrowRight:arrow.right,clipped:name.scrollWidth>name.clientWidth,display:getComputedStyle(name).display,overflow:getComputedStyle(name).textOverflow};
+   });
+   assert(bounds.cardRight<=bounds.sidebarRight,JSON.stringify(bounds));
+   assert(bounds.nameRight<=bounds.arrowLeft,JSON.stringify(bounds));
+   assert(bounds.arrowRight<=bounds.cardRight,JSON.stringify(bounds));
+   assert.equal(bounds.display,'block');assert.equal(bounds.overflow,'ellipsis');assert(bounds.clipped);
+  }
+ }
+ await page.locator('#deviceToggle').click();
+ await page.screenshot({path:path.join(shot,'05-long-name-sidebar.png')});
  assert.deepEqual(errors,[]);
- const report={tests:['English Enter save','Chinese blur save','Escape cancel','illegal characters','empty title','duplicate title suffix','poll retains editor','IME Enter ignored','PDF and JPEG references','file list and restart history','discovery searching/none/multiple/unsupported UI','device selection','960px layout'],javascriptErrors:errors};fs.writeFileSync(path.join(shot,'report.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
+ const report={tests:['English Enter save','Chinese blur save','Escape cancel','illegal characters','empty title','duplicate title suffix','poll retains editor','IME Enter ignored','PDF and JPEG references','file list and restart history','discovery searching/none/multiple/unsupported UI','device selection','960px layout','long English/Chinese Bonjour names at 1120px and 960px','full name tooltip and contained dropdown arrow'],javascriptErrors:errors};fs.writeFileSync(path.join(shot,'report.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
 })().catch(e=>{console.error(e);process.exitCode=1}).finally(async()=>{if(browser)await browser.close();proc.kill();});

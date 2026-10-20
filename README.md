@@ -6,7 +6,7 @@ M175 Studio is not affiliated with HP or Apple and does not claim official suppo
 
 ## Install
 
-1. For this 0.3.0 test build, use the supplied universal Mac ZIP. The published [Releases](https://github.com/WS-FL/M175-Studio/releases) still contain earlier versions.
+1. For this 0.3.1 test build, use the supplied universal Mac ZIP. The published [Releases](https://github.com/WS-FL/M175-Studio/releases) still contain earlier versions.
 2. Quit any running copy, unzip the download and move the entire **M175 Studio.app** to **Applications**. Replace the old app if prompted.
 3. Open the app and allow automatic discovery to finish. Click the lower-left device area to choose a supported scanner or refresh discovery. If necessary, use **Settings > Advanced / Manual Connection** to enter a local IP and port (default `8289`).
 4. Keep your Mac and printer on the same local network. Allow local network access when macOS asks, then click **Check Connection**.
@@ -22,7 +22,7 @@ Requires macOS 12 or later. The app includes Apple Silicon and Intel executables
 - Bounded Bonjour / local subnet discovery with read-only legacy SOAP confirmation and remembered scanner selection. Unconfirmed devices are labeled as unsupported.
 - Click a preview title to rename it inline. Enter or clicking elsewhere saves; Escape cancels. The main PDF reflects the name in Finder while original page names and scan folder IDs stay stable.
 
-See [0.3.0 test build notes](RELEASE_NOTES_0.3.0.md) for discovery limits and the validation scope.
+See [0.3.1 display fix](RELEASE_NOTES_0.3.1.md) and [0.3.0 test build notes](RELEASE_NOTES_0.3.0.md) for discovery limits and the validation scope.
 
 - Flatbed color scanning at 300 dpi was previously verified on a real M175nw. ADF and other combinations still need hardware testing. Simulated printer tests are not evidence of ADF hardware compatibility.
 - The English revision rebuilds the available source using the real macOS SDK. Its scanner logic derives from the available 0.2.0 source snapshot. It preserves the compact scan header introduced in 0.2.2. It is not a byte-for-byte reconstruction of the earlier Chinese 0.2.2 package.

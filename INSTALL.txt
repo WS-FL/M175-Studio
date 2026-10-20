@@ -1,4 +1,4 @@
-M175 Studio 0.3.0 - English revision
+M175 Studio 0.3.1 - English revision
 
 1. Quit any running copy of M175 Studio.
 2. Move the entire M175 Studio.app to Applications, replacing the old copy if asked.
@@ -20,4 +20,4 @@ revision and other scan combinations still need real-printer testing.
 0.3.0: Automatic local scanner discovery starts at launch. Click the lower-left
 device area to select or refresh. Manual IP entry remains in Settings >
 Advanced / Manual Connection. Click the preview title to rename a document;
-Enter/click elsewhere saves, Escape cancels. See RELEASE_NOTES_0.3.0.md.
+Enter/click elsewhere saves, Escape cancels. See RELEASE_NOTES_0.3.1.md and RELEASE_NOTES_0.3.0.md.

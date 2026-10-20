@@ -14,3 +14,10 @@ main{flex:1;min-width:0;display:flex;flex-direction:column;position:relative;pad
 /* 0.3: small, local controls retain the existing scan workspace. */
 .device-picker{position:relative}.device-mini{width:100%;text-align:left;border:0;background:transparent;border-radius:8px;cursor:pointer;color:inherit;padding:8px}.device-mini:hover{background:rgba(40,105,80,.08)}.device-mini>div{min-width:0;flex:1}.device-mini strong,.device-mini small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.device-menu{position:absolute;bottom:100%;left:0;width:260px;max-width:calc(100vw - 32px);padding:14px;background:#fff;border:1px solid #d9e2d8;border-radius:12px;box-shadow:0 10px 36px #233b2825;z-index:20}.device-menu select{width:100%;margin:8px 0}.device-menu .text-button{display:block;margin-top:12px;text-align:left}.device-menu label{font-size:12px;font-weight:600}.device-menu p{overflow-wrap:anywhere}
 .preview-toolbar>div:first-child{min-width:0;flex:1}#previewTitle{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-radius:5px;padding:4px 6px;margin-left:-6px;cursor:text;border:1px solid transparent}#previewTitle:not([aria-disabled="true"]):hover{background:#eef3ed;border-color:#d2ded0}#previewTitle:not([aria-disabled="true"]):hover::after{content:' ✎';color:#6d826d;font-weight:400}#previewTitle:focus-visible{outline:2px solid #72a37c}#titleEdit{width:100%;font:inherit;font-size:16px;font-weight:600;padding:4px 6px;margin:0 0 4px -6px;border:1px solid #72a37c;border-radius:5px;background:#fff}#previewMeta{display:block}.device-mini:disabled{cursor:default;opacity:.65}
+
+/* Keep long Bonjour instance names inside the existing sidebar card. */
+.device-picker{min-width:0;max-width:100%}
+.device-mini{min-width:0;max-width:100%;margin:20px 0 24px;overflow:hidden}
+.device-mini>div{overflow:hidden}
+.device-mini strong{display:block}
+.device-mini>span:last-child{flex-shrink:0}

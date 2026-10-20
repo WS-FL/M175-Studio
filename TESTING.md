@@ -25,3 +25,6 @@ Run `go test -race -count=1 ./...` in engine/ for protocol discovery, preferred 
 For the added UI harness, install Node and Playwright Chromium, build `build/m175-engine` from engine/, then run `node tests/features-ui.cjs` from the repository root. Playwright must be resolvable by Node (or NODE_PATH). Screenshots and the JSON report are written to ignored build/feature-ui/. Discovery states in the UI harness are explicit fixtures; HTTP/SOAP probes are exercised by the Go tests. `--no-discovery` is a test-only engine flag that prevents LAN traffic during isolated UI runs. Setting an absolute M175_STUDIO_TEST_ROOT for native host testing likewise isolates settings/logs and disables LAN discovery.
 
 Hardware acceptance still requires: grant/deny Local Network permission, find the real M175nw, remember it across relaunch, refresh after disconnect, scan flatbed color 300 dpi, and open/reveal a renamed PDF and its original JPEG pages. Verify Intel execution on an Intel Mac; cross-compilation and signature checks alone do not establish runtime compatibility.
+
+
+0.3.1 adds long English, Chinese and unusually long Bonjour-name layout checks at 1120px and 960px widths, including effective ellipsis, card bounds, visible dropdown arrow and full-name tooltips.

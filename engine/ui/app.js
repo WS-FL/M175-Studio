@@ -129,7 +129,11 @@ async function openFile(action){try{await api('open',{action,id:selectedID});}ca
 function renderDevices(s){
   const discovery=s.discovery||{},devices=discovery.devices||[];
   const chosen=devices.find(d=>d.ip===s.settings.ip&&d.port===s.settings.port);
-  $('deviceName').textContent=chosen?.name||'Scanner';
+  const deviceName=chosen?.name||'Scanner';
+  $('deviceName').textContent=deviceName;$('deviceName').title=deviceName;
+  $('deviceToggle').title=deviceName+' · '+s.settings.ip+':'+s.settings.port;
+  $('sideIP').title=s.settings.ip+':'+s.settings.port;
+  $('deviceSelect').title=deviceName+' · '+s.settings.ip+':'+s.settings.port;
   $('sideIP').textContent=discovery.busy?'Searching…':s.connection.status==='online'?'Connected · '+s.settings.ip:devices.length?'No supported scanner connected':'No devices found';
   $('discoveryMessage').textContent=discovery.busy?'Searching the local network…':discovery.message||'Use Refresh to search for scanners.';
   const options=JSON.stringify([devices,s.settings.ip,s.settings.port]);
