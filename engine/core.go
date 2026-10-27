@@ -26,7 +26,7 @@ import (
 	"time"
 )
 
-const version = "0.3.4 beta"
+const version = "0.3.5 beta"
 const scanNS = "http://tempuri.org/wscn.xsd"
 const maxResponse = 128 << 20
 

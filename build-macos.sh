@@ -22,7 +22,7 @@ for pair in 'arm64 arm64' 'amd64 x86_64'; do
   python3 sign_macho.py "$APP/Contents/Resources/m175-engine-$macarch" "local.m175.studio.engine.$macarch"
   /usr/bin/codesign --force --sign - --timestamp=none "$APP/Contents/Resources/m175-engine-$macarch"
 done
-xcrun clang -arch arm64 -arch x86_64 -mmacosx-version-min=12.0 -O2 -fblocks -fno-objc-arc -framework Cocoa -framework WebKit native/Studio.m -o "$APP/Contents/MacOS/M175Studio"
+xcrun clang -arch arm64 -arch x86_64 -mmacosx-version-min=12.0 -O2 -fblocks -fno-objc-arc -framework Cocoa -framework WebKit native/Studio.m native/FileActions.m -o "$APP/Contents/MacOS/M175Studio"
 /usr/bin/codesign --force --sign - --timestamp=none "$APP"
 /usr/bin/codesign --verify --deep --strict --verbose=2 "$APP"
 printf '\nBuilt: %s\nThis is ad-hoc signed; it is not Apple-notarized.\n' "$APP"

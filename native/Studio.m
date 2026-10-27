@@ -7,6 +7,8 @@
 #import "MacABI.h"
 #endif
 
+#import "FileActions.h"
+
 @interface StudioDelegate : NSObject <NSApplicationDelegate, NSWindowDelegate, WKScriptMessageHandler, WKNavigationDelegate> {
     NSWindow *window;
     WKWebView *web;
@@ -35,6 +37,11 @@ static NSString *JSString(NSString *s){
 @implementation StudioDelegate
 - (void)showAbout:(id)sender{[self showSettings:sender];}
 - (void)showSettings:(id)sender{[web evaluateJavaScript:@"window.studioShowSettings && window.studioShowSettings()" completionHandler:nil];[window makeKeyAndOrderFront:nil];}
+- (void)copyFileOrText:(id)sender{
+    [web evaluateJavaScript:@"window.studioCopySelection ? window.studioCopySelection() : false" completionHandler:^(id handled,NSError *error){
+        if(error||![handled boolValue])[[NSApplication sharedApplication] sendAction:@selector(copy:) to:nil from:sender];
+    }];
+}
 - (void)installMenu{
     NSMenu *bar=[[[NSMenu alloc] initWithTitle:@""] autorelease];
     NSMenu *appMenu=[[[NSMenu alloc] initWithTitle:@"M175 Studio"] autorelease];
@@ -48,7 +55,7 @@ static NSString *JSString(NSString *s){
     [edit addItem:MenuItem(@"Undo",@selector(undo:),@"z",nil)];
     [edit addItem:[NSMenuItem separatorItem]];
     [edit addItem:MenuItem(@"Cut",@selector(cut:),@"x",nil)];
-    [edit addItem:MenuItem(@"Copy",@selector(copy:),@"c",nil)];
+    [edit addItem:MenuItem(@"Copy",@selector(copyFileOrText:),@"c",self)];
     [edit addItem:MenuItem(@"Paste",@selector(paste:),@"v",nil)];
     [edit addItem:MenuItem(@"Select All",@selector(selectAll:),@"a",nil)];
     NSMenuItem *editRoot=MenuItem(@"Edit",(SEL)0,@"",nil);[editRoot setSubmenu:edit];[bar addItem:editRoot];
@@ -104,6 +111,7 @@ static NSString *JSString(NSString *s){
     NSString *enginePath=[[[NSBundle mainBundle] resourcePath] stringByAppendingPathComponent:binary];
     engine=[[NSTask alloc] init];[engine setExecutableURL:[NSURL fileURLWithPath:enginePath]];
     NSMutableArray *arguments=[NSMutableArray arrayWithObjects:@"--ready-file",readyPath,@"--watch-stdin",nil];
+    [arguments addObject:@"--native-helper"];[arguments addObject:[[NSBundle mainBundle] executablePath]];
     if(testRoot){[arguments addObject:@"--no-discovery"];[arguments addObject:@"--support-dir"];[arguments addObject:[testRoot stringByAppendingPathComponent:@"support"]];}
     [engine setArguments:arguments];
     lifetimePipe=[[NSPipe pipe] retain];[engine setStandardInput:lifetimePipe];
@@ -169,6 +177,7 @@ static NSString *JSString(NSString *s){
 @end
 int main(int argc,const char *argv[]){
     @autoreleasepool {
+        int fileResult=StudioFileActionMain(argc,argv);if(fileResult>=0)return fileResult;
         NSApplication *app=[NSApplication sharedApplication];[app setActivationPolicy:0];
         StudioDelegate *delegate=[[StudioDelegate alloc] init];[app setDelegate:delegate];[app run];
         [delegate release];

@@ -108,6 +108,67 @@ let stderr='';proc.stderr.on('data',b=>stderr+=b);let browser;
  await page.waitForFunction(()=>document.getElementById('sideIP').textContent==='192.168.5.85');
  await page.locator('#deviceToggle').click();
  await page.screenshot({path:path.join(shot,'05-long-name-sidebar.png')});
+ // File-management interactions use only the two disposable fixtures above.
+ await page.setViewportSize({width:1120,height:790});
+ await page.locator('#tab-files').click();
+ let copies=[],trashRequests=[],trashFails=true;
+ await page.route('**/api/copy-files',async route=>{copies.push(route.request().postDataJSON());await route.fulfill({json:{ok:true}});});
+ await page.route('**/api/trash',async route=>{
+  const body=route.request().postDataJSON();trashRequests.push(body);
+  if(trashFails){await route.fulfill({status:409,json:{error:'Test: Trash unavailable'}});return;}
+  // Simulate the native move for UI tests; the real Mac Trash is tested separately.
+  fs.renameSync(path.join(output,body.id),path.join(temp,'trashed-'+body.id));
+  await fetch(url+'api/refresh',{method:'POST',headers:{'X-M175-Request':'1'},body:'{}'});
+  await route.fulfill({json:{ok:true}});
+ });
+ const rows=page.locator('.document-item');await rows.first().click();
+ const names=await rows.locator('strong').allTextContents();
+ await page.keyboard.press('ArrowDown');assert.equal(await title.innerText(),names[1]);
+ await page.keyboard.press('ArrowDown');assert.equal(await title.innerText(),names[1]);
+ await page.keyboard.press('ArrowUp');assert.equal(await title.innerText(),names[0]);
+ await page.waitForTimeout(1900);assert(await rows.first().evaluate(el=>el===document.activeElement));
+ await page.keyboard.press('Enter');assert(await input.isVisible());await input.fill('From keyboard');await input.press('Escape');assert.equal(await title.innerText(),names[0]);
+ await page.keyboard.press('F2');await input.fill('Keyboard 文件');await input.press('Enter');await page.waitForFunction(()=>document.getElementById('previewTitle').textContent==='Keyboard 文件');
+ await page.locator('#renameFile').click();await input.fill('Toolbar rename');await page.locator('#previewMeta').click();await page.waitForFunction(()=>document.getElementById('previewTitle').textContent==='Toolbar rename');
+ await rows.first().click();await page.keyboard.press('Meta+c');await page.waitForFunction(()=>document.getElementById('toast').textContent.startsWith('PDF copied'));assert.equal(copies.length,1);assert.equal(copies[0].id,'scan-one');
+ // Native menu routes through this hook so Copy remains available without text selection.
+ assert(await page.evaluate(()=>window.studioCopySelection()));await page.waitForTimeout(150);assert.equal(copies.length,2);
+ await page.locator('#fileSearch').fill('Second');await page.keyboard.press('ArrowDown');assert.equal(await page.locator('#fileSearch').inputValue(),'Second');
+ assert.equal(await title.innerText(),'Second scan');await page.keyboard.press('Meta+a');await page.keyboard.press('Meta+c');await page.waitForTimeout(150);assert.equal(copies.length,2);
+ assert.equal(await page.evaluate(()=>window.studioCopySelection()),false);
+ await page.keyboard.press('Backspace');assert.equal(await page.locator('#fileSearch').inputValue(),'');assert(!(await page.locator('#trashDialog').isVisible()));
+ await rows.first().click({button:'right'});assert(await page.locator('#fileMenu').isVisible());
+ await page.locator('[data-file-action="copy"]').click();await page.waitForTimeout(150);assert.equal(copies.length,3);assert.equal(copies[2].id,'scan-one');
+ await rows.last().click({button:'right'});await page.locator('[data-file-action="rename"]').click();assert(await input.isVisible());assert.equal(await input.inputValue(),'Second scan');await input.press('Escape');
+ await page.keyboard.press('Delete');assert(await page.locator('#trashDialog').isVisible());assert.equal(await page.locator('#trashName').innerText(),'Second scan');
+ assert(await page.locator('#cancelTrash').evaluate(el=>el===document.activeElement));
+ await page.keyboard.press('Enter');assert(!(await page.locator('#trashDialog').isVisible()));assert.equal(trashRequests.length,0);
+ await page.keyboard.press('Backspace');await page.keyboard.press('Escape');assert(!(await page.locator('#trashDialog').isVisible()));assert.equal(trashRequests.length,0);
+ await page.locator('#trashFile').click();await page.keyboard.press('Tab');assert(await page.locator('#confirmTrash').evaluate(el=>el===document.activeElement));await page.keyboard.press('Tab');assert(await page.locator('#cancelTrash').evaluate(el=>el===document.activeElement));
+ await page.locator('#confirmTrash').click();await page.waitForFunction(()=>document.getElementById('trashError').textContent.includes('unavailable'));assert.equal(await rows.count(),2);assert(fs.existsSync(path.join(output,'scan-two')));
+ await page.screenshot({path:path.join(shot,'08-trash-confirmation.png')});await page.locator('#cancelTrash').click();
+ // Failed copy reports an error rather than falsely claiming clipboard success.
+ await page.unroute('**/api/copy-files');await page.route('**/api/copy-files',route=>route.fulfill({status:409,json:{error:'Test: clipboard unavailable'}}));
+ await page.locator('#copyFile').click();await page.waitForFunction(()=>document.getElementById('toast').textContent.includes('Copy failed'));
+ await rows.first().click({button:'right'});await page.screenshot({path:path.join(shot,'07-file-menu.png')});await page.keyboard.press('Escape');
+ for(const width of [960,1120]){
+  await page.setViewportSize({width,height:665});
+  assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+  assert(await page.locator('.file-actions').evaluate(el=>el.scrollWidth<=el.clientWidth));
+  assert(await page.locator('.document-list').evaluate(el=>el.clientHeight>100));
+ }
+ await page.setViewportSize({width:1120,height:790});
+ // A filtered list navigates only matching results; no hidden selection is deleted.
+ await page.locator('#fileSearch').fill('Toolbar');await rows.first().click();await page.keyboard.press('ArrowDown');assert.equal(await title.innerText(),'Toolbar rename');
+ await page.locator('#fileSearch').fill('no-matching-documents');assert(await page.locator('#copyFile').isDisabled());assert.equal(await title.innerText(),'Page Preview');
+ await page.locator('#fileSearch').fill('');await rows.last().click({button:'right'});await page.locator('[data-file-action="trash"]').click();
+ trashFails=false;await page.locator('#confirmTrash').click();await page.waitForFunction(()=>document.getElementById('docCount').textContent==='1');
+ assert.equal(await rows.count(),1);assert.equal(await title.innerText(),'Toolbar rename');assert.deepEqual(trashRequests.at(-1),{id:'scan-two',confirmed:true});
+ assert(fs.existsSync(path.join(temp,'trashed-scan-two','page-001.jpg')));assert(!fs.existsSync(path.join(output,'scan-two')));
+ await page.reload();await page.waitForFunction(()=>document.getElementById('docCount').textContent==='1');await page.locator('#tab-files').click();
+ assert.equal(await title.innerText(),'Toolbar rename');await rows.first().click();await page.keyboard.press('Delete');await page.locator('#confirmTrash').click();await page.waitForFunction(()=>document.getElementById('docCount').textContent==='0');
+ assert.equal(await title.innerText(),'Page Preview');assert(await page.locator('#renameFile').isDisabled());assert(await page.locator('#copyFile').isDisabled());
+
  assert.deepEqual(errors,[]);
- const report={tests:['campus IP Save and Check plus settings persistence/reload','English Enter save','Chinese blur save','Escape cancel','illegal characters','empty title','duplicate title suffix','poll retains editor','IME Enter ignored','PDF and JPEG references','file list and restart history','discovery searching/none/multiple/unsupported UI','device selection','960px layout','long English/Chinese Bonjour names at 1120px and 960px','wrapped full device name and contained dropdown arrow','full IPv4 and wrapped IPv6 addresses at minimum window size'],javascriptErrors:errors};fs.writeFileSync(path.join(shot,'report.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
+ const report={tests:['Files arrow navigation and polling focus','Return/F2/toolbar/context rename','Command-C and native Copy hook','text editing copy/delete preserved','right-click selects target','Delete/Backspace confirmation, default cancel, Escape and focus trap','failed Trash and copy recovery','filtered navigation and empty results','confirmed Trash, neighbor preview and reload','last document deletion','compact file controls at minimum window size','campus IP Save and Check plus settings persistence/reload','English Enter save','Chinese blur save','Escape cancel','illegal characters','empty title','duplicate title suffix','poll retains editor','IME Enter ignored','PDF and JPEG references','file list and restart history','discovery searching/none/multiple/unsupported UI','device selection','960px layout','long English/Chinese Bonjour names at 1120px and 960px','wrapped full device name and contained dropdown arrow','full IPv4 and wrapped IPv6 addresses at minimum window size'],javascriptErrors:errors};fs.writeFileSync(path.join(shot,'report.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));
 })().catch(e=>{console.error(e);process.exitCode=1}).finally(async()=>{if(browser)await browser.close();proc.kill();});

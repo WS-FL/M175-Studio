@@ -1,6 +1,7 @@
 'use strict';
 const $ = id => document.getElementById(id);
 let editingTitle = null;
+let trashTarget = null, fileActionBusy = false;
 let appState = null, initialized = false, currentTab = 'scan', source = 'platen';
 let selectedID = '', pageIndex = 0, rotation = 0, previewSignature = '', listSignature = '', lastCompleted = '';
 let requestBusy = false, toastTimer = 0, unavailableCount = 0, lastLog = '', chosenPath = '';
@@ -37,7 +38,7 @@ function updateOptions(){
 }
 const titles={scan:['SCAN WORKSPACE','Scan','Scan, preview and save from your M175nw.'],files:['DOCUMENT LIBRARY','Files','Browse documents saved on this Mac.'],settings:['PREFERENCES','Settings','Manage connection, output and scan preferences.'],diagnostics:['CONNECTION & ACTIVITY','Diagnostics','View scanner status and job logs.']};
 function switchTab(tab){
-  if(!titles[tab])return;currentTab=tab;
+  if(!titles[tab]||trashTarget)return;closeFileMenu();currentTab=tab;
   document.querySelectorAll('[data-tab]').forEach(b=>{let yes=b.dataset.tab===tab;b.classList.toggle('active',yes);b.setAttribute('aria-selected',String(yes));});
   document.querySelectorAll('.page').forEach(p=>{let yes=p.id==='page-'+tab;p.classList.toggle('active',yes);p.hidden=!yes;});
   [$('eyebrow').textContent,$('pageTitle').textContent,$('pageSubtitle').textContent]=titles[tab];
@@ -53,20 +54,29 @@ function sizeText(bytes){return bytes<1048576?(bytes/1024).toFixed(0)+' KB':(byt
 function asset(doc,name){return 'asset/'+encodeURIComponent(doc.id)+'/'+encodeURIComponent(name);}
 function selectDocument(id){selectedID=id;pageIndex=0;rotation=0;previewSignature='';listSignature='';renderFiles();renderPreview();}
 function currentDocument(){return appState?.documents?.find(d=>d.id===selectedID)||null;}
+function visibleDocuments(){
+  const q=$('fileSearch').value.trim().toLocaleLowerCase();
+  return (appState?.documents||[]).filter(d=>d.title.toLocaleLowerCase().includes(q));
+}
 function renderFiles(){
   if(!appState)return;const q=$('fileSearch').value.trim().toLocaleLowerCase();
-  const docs=appState.documents.filter(d=>d.title.toLocaleLowerCase().includes(q));
+  const docs=visibleDocuments();
+  ['renameFile','copyFile','trashFile'].forEach(id=>$(id).disabled=!currentDocument()||appState.job.busy||fileActionBusy);
+
   const signature=JSON.stringify([docs,selectedID,q]);if(signature===listSignature)return;listSignature=signature;
-  const list=$('documentList');const scroll=list.scrollTop;list.replaceChildren();
+  const list=$('documentList');const scroll=list.scrollTop,hadFocus=list.contains(document.activeElement);list.replaceChildren();
   if(!docs.length){let p=document.createElement('div');p.className='empty-list';p.textContent=q?'No matching documents.':'No scans yet.\nYour first scan will appear here.';list.append(p);}
   docs.forEach(doc=>{
-    const row=document.createElement('button');row.className='document-item'+(doc.id===selectedID?' active':'');row.setAttribute('aria-label',doc.title);row.addEventListener('click',()=>selectDocument(doc.id));
+    const row=document.createElement('button');row.className='document-item'+(doc.id===selectedID?' active':'');row.setAttribute('aria-label',doc.title);row.setAttribute('aria-pressed',String(doc.id===selectedID));row.dataset.id=doc.id;row.tabIndex=doc.id===selectedID||!docs.some(d=>d.id===selectedID)?0:-1;
+    row.addEventListener('click',()=>{selectDocument(doc.id);focusDocument();});
+    row.addEventListener('dblclick',beginRename);
+    row.addEventListener('contextmenu',e=>{e.preventDefault();selectDocument(doc.id);showFileMenu(e.clientX,e.clientY);});
     const im=document.createElement('img');im.className='document-thumb';im.src=asset(doc,doc.pages[0]);im.loading='lazy';im.alt='';
     const info=document.createElement('div'),title=document.createElement('strong'),meta=document.createElement('small');title.textContent=doc.title;title.title=doc.title;
     meta.textContent=formatDate(doc.created)+' · '+doc.pages.length+' pages - '+(doc.pdf?'PDF':'JPEG');info.append(title,meta);
     if(doc.partial){let tag=document.createElement('span');tag.className='partial-tag';tag.textContent='Incomplete - received pages kept';info.append(tag);}
     row.append(im,info);list.append(row);
-  });list.scrollTop=scroll;
+  });list.scrollTop=scroll;if(hadFocus)focusDocument(false);
 }
 function renderPreview(){
   const doc=currentDocument();const has=Boolean(doc&&doc.pages.length);pageIndex=has?Math.max(0,Math.min(pageIndex,doc.pages.length-1)):0;
@@ -147,17 +157,104 @@ function renderDevices(s){
   $('discoverDevices').disabled=Boolean(discovery.busy||s.job.busy);
 }
 function beginRename(){
-  const doc=currentDocument();if(!doc||editingTitle||appState?.job?.busy)return;
+  const doc=currentDocument();if(!doc||editingTitle||appState?.job?.busy||fileActionBusy||trashTarget)return;
   editingTitle={id:doc.id,title:doc.title};$('titleEdit').value=doc.title;$('titleEdit').classList.remove('hidden');$('previewTitle').classList.add('hidden');$('titleEdit').focus();$('titleEdit').select();
 }
 async function finishRename(cancel=false){
   if(!editingTitle)return;const edit=editingTitle,value=$('titleEdit').value;editingTitle=null;
   $('titleEdit').classList.add('hidden');$('previewTitle').classList.remove('hidden');
-  if(cancel||value===edit.title){renderPreview();return;}
+  if(cancel||value===edit.title){renderPreview();if(cancel)focusDocument(false);return;}
   try{const doc=await api('rename',{id:edit.id,title:value});renderState(await api('state'));toast('Renamed to “'+doc.title+'”.');}
   catch(e){toast('Rename failed: '+e.message,true);renderPreview();}
 }
+function focusDocument(scroll=true){
+  const row=[...$('documentList').children].find(el=>el.dataset.id===selectedID);
+  if(row){row.focus({preventScroll:true});if(scroll)row.scrollIntoView({block:'nearest'});}
+}
+function editableTarget(target){return Boolean(target?.closest('input,textarea,select,[contenteditable="true"]'));}
+function closeFileMenu(){ $('fileMenu').classList.add('hidden'); }
+function showFileMenu(x,y){
+  if(appState?.job?.busy||fileActionBusy||trashTarget)return;
+  const menu=$('fileMenu');menu.classList.remove('hidden');
+  menu.style.left=Math.max(8,Math.min(x,innerWidth-menu.offsetWidth-8))+'px';
+  menu.style.top=Math.max(8,Math.min(y,innerHeight-menu.offsetHeight-8))+'px';
+  menu.querySelector('[data-file-action="copy"]').firstChild.textContent=currentDocument()?.pdf?'Copy PDF ':'Copy Images ';
+  menu.querySelector('button').focus();
+}
+async function copyDocument(){
+  const doc=currentDocument();if(!doc||appState?.job?.busy||fileActionBusy||trashTarget)return;
+  fileActionBusy=true;renderFiles();
+  try{await api('copy-files',{id:doc.id});toast(doc.pdf?'PDF copied. Paste it in Finder or another app.':'Original images copied. Paste them in Finder or another app.');}
+  catch(e){toast('Copy failed: '+e.message,true);}
+  finally{fileActionBusy=false;renderFiles();}
+}
+window.studioCopySelection = () => {
+  if(currentTab!=='files'||editableTarget(document.activeElement)||trashTarget||String(window.getSelection()).length||!currentDocument())return false;
+  closeFileMenu();copyDocument();return true;
+};
+function askTrash(){
+  const doc=currentDocument();if(!doc||appState?.job?.busy||fileActionBusy||trashTarget)return;
+  closeFileMenu();trashTarget={id:doc.id,title:doc.title};
+  $('trashName').textContent=doc.title;$('trashError').textContent='';
+  $('trashDialog').classList.remove('hidden');$('cancelTrash').focus();
+}
+function cancelTrash(){
+  if(fileActionBusy)return;trashTarget=null;$('trashDialog').classList.add('hidden');focusDocument(false);
+}
+async function confirmTrash(){
+  if(!trashTarget||fileActionBusy)return;
+  const target=trashTarget,docs=visibleDocuments(),idx=docs.findIndex(d=>d.id===target.id);
+  const next=docs[idx+1]||docs[idx-1];fileActionBusy=true;
+  $('confirmTrash').disabled=true;$('cancelTrash').disabled=true;renderFiles();
+  try{
+    await api('trash',{id:target.id,confirmed:true});
+    // Once Trash succeeds, never leave a second confirmation for this document.
+    trashTarget=null;$('trashDialog').classList.add('hidden');
+    appState.documents=appState.documents.filter(d=>d.id!==target.id);selectDocument(next?.id||'');
+    renderState(await api('state'));focusDocument();toast('Moved “'+target.title+'” to Trash.');
+  }catch(e){if(trashTarget)$('trashError').textContent=e.message;else toast('Moved to Trash. Refresh history to update the list.',true);}
+  finally{fileActionBusy=false;$('confirmTrash').disabled=false;$('cancelTrash').disabled=false;renderFiles();}
+}
+function fileKeys(e){
+  if(trashTarget){
+    if(e.key==='Escape'){e.preventDefault();cancelTrash();}
+    if(e.key==='Tab'){e.preventDefault();if(!fileActionBusy)(document.activeElement===$('cancelTrash')?$('confirmTrash'):$('cancelTrash')).focus();}
+    return;
+  }
+  if(!$('fileMenu').classList.contains('hidden')){
+    const buttons=[...$('fileMenu').querySelectorAll('button')];
+    if(e.key==='Escape'||e.key==='Tab'){e.preventDefault();closeFileMenu();focusDocument(false);}
+    else if(['ArrowDown','ArrowUp'].includes(e.key)){e.preventDefault();const idx=buttons.indexOf(document.activeElement);buttons[(idx+(e.key==='ArrowDown'?1:buttons.length-1))%buttons.length].focus();}
+    return;
+  }
+  if(e.defaultPrevented||currentTab!=='files'||editableTarget(e.target)||e.target.closest('nav')||e.isComposing||e.metaKey||e.ctrlKey||e.altKey||e.shiftKey)return;
+  if(['ArrowUp','ArrowDown'].includes(e.key)){
+    e.preventDefault();const docs=visibleDocuments();if(!docs.length)return;
+    const idx=docs.findIndex(d=>d.id===selectedID),next=idx<0?0:Math.max(0,Math.min(docs.length-1,idx+(e.key==='ArrowDown'?1:-1)));
+    selectDocument(docs[next].id);focusDocument();
+  }else if((e.key==='Enter'&&e.target.closest('.document-item'))||e.key==='F2'){e.preventDefault();beginRename();}
+  else if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();askTrash();}
+  else if(e.key==='ContextMenu'){e.preventDefault();const row=[...$('documentList').children].find(el=>el.dataset.id===selectedID);if(row){const b=row.getBoundingClientRect();showFileMenu(b.left,b.top);}}
+}
 function bind(){
+  $('renameFile').addEventListener('click',beginRename);
+  $('copyFile').addEventListener('click',copyDocument);
+  $('trashFile').addEventListener('click',askTrash);
+  $('cancelTrash').addEventListener('click',cancelTrash);
+  $('confirmTrash').addEventListener('click',confirmTrash);
+  document.querySelectorAll('[data-file-action]').forEach(button=>button.addEventListener('click',()=>{
+    closeFileMenu();const action=button.dataset.fileAction;
+    if(action==='rename')beginRename();else if(action==='copy'){focusDocument(false);copyDocument();}else askTrash();
+  }));
+  document.addEventListener('pointerdown',e=>{if(!e.target.closest('#fileMenu'))closeFileMenu();});
+  window.addEventListener('resize',closeFileMenu);
+  document.addEventListener('keydown',fileKeys);
+  // Native Edit > Copy and Command-C both dispatch the WebView copy event.
+  // Preserve ordinary copying whenever the user is editing or selecting text.
+  document.addEventListener('copy',e=>{
+    if(currentTab!=='files'||editableTarget(e.target)||editableTarget(document.activeElement)||trashTarget||String(window.getSelection()).length||!currentDocument())return;
+    e.preventDefault();closeFileMenu();copyDocument();
+  });
   $('deviceToggle').addEventListener('click',()=>{const open=$('deviceMenu').classList.contains('hidden');$('deviceMenu').classList.toggle('hidden',!open);$('deviceToggle').setAttribute('aria-expanded',String(open));});
   document.addEventListener('click',e=>{if(!e.target.closest('.device-picker')){$('deviceMenu').classList.add('hidden');$('deviceToggle').setAttribute('aria-expanded','false');}});
   $('manualConnection').addEventListener('click',()=>{switchTab('settings');$('deviceMenu').classList.add('hidden');$('settingIP').focus();});
@@ -176,7 +273,7 @@ function bind(){
   $('saveSettings').addEventListener('click',async()=>{try{await save();}catch(e){toast(e.message,true);}});
   $('changeOutput').addEventListener('click',()=>{switchTab('settings');$('settingOutput').focus();});
   $('chooseFolder').addEventListener('click',()=>{if(!native('chooseFolder',{path:$('settingOutput').value}))toast('The system folder picker is unavailable in a test browser. Enter an absolute path instead.',true);});
-  $('fileSearch').addEventListener('input',renderFiles);
+  $('fileSearch').addEventListener('input',()=>{renderFiles();const docs=visibleDocuments();if(!docs.some(d=>d.id===selectedID))selectDocument(docs[0]?.id||'');});
   $('refreshFiles').addEventListener('click',async()=>{try{await api('refresh',{});renderState(await api('state'));toast('Scan history refreshed.');}catch(e){toast(e.message,true);}});
   $('prevPage').addEventListener('click',()=>{pageIndex--;rotation=0;renderPreview();});$('nextPage').addEventListener('click',()=>{pageIndex++;rotation=0;renderPreview();});
   $('previewImage').addEventListener('load',applyZoom);$('previewImage').addEventListener('error',()=>{if(currentDocument())toast('Cannot read this image. It may have been moved. Refresh scan history.',true);});
@@ -185,7 +282,7 @@ function bind(){
   $('errorDetails').addEventListener('click',()=>switchTab('diagnostics'));$('viewDiagnostics').addEventListener('click',()=>switchTab('diagnostics'));
   $('openPrivacy').addEventListener('click',()=>{if(!native('privacy'))toast('System Settings > Privacy & Security > Local Network.');});
   $('copyLog').addEventListener('click',async()=>{const text=appState?.job?.logs?.join('\n')||'No logs yet';if(native('copy',{text})){toast('Log copied.');return;}try{await navigator.clipboard.writeText(text);toast('Log copied.');}catch(e){toast('Select the log and press Command-C.');}});
-  document.addEventListener('keydown',e=>{if(e.metaKey&&['1','2','3','4'].includes(e.key)){e.preventDefault();switchTab(['scan','files','settings','diagnostics'][Number(e.key)-1]);}if(e.metaKey&&e.key==='Enter'){e.preventDefault();operate('scan');}});
+  document.addEventListener('keydown',e=>{if(trashTarget||e.defaultPrevented)return;if(e.metaKey&&['1','2','3','4'].includes(e.key)){e.preventDefault();switchTab(['scan','files','settings','diagnostics'][Number(e.key)-1]);}if(e.metaKey&&e.key==='Enter'){e.preventDefault();operate('scan');}});
   // Tab buttons support vertical keyboard navigation.
   document.querySelector('nav').addEventListener('keydown',e=>{if(!['ArrowDown','ArrowUp'].includes(e.key))return;e.preventDefault();const all=[...document.querySelectorAll('[data-tab]')],idx=all.indexOf(document.activeElement),next=all[(idx+(e.key==='ArrowDown'?1:3))%4];next.focus();switchTab(next.dataset.tab);});
   $('scanPreviewMount').appendChild($('previewPanel'));renderPreview();setInterval(updateElapsed,1000);poll();

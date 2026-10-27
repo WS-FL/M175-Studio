@@ -15,11 +15,11 @@ The output is `mac-build/M175 Studio.app`. The script builds both Go engines wit
 For a distributable ZIP, place the app and `INSTALL.txt` in a folder and compress it with macOS `ditto`:
 
 ```sh
-mkdir -p release/M175-Studio-0.3.0
-cp -R "mac-build/M175 Studio.app" release/M175-Studio-0.3.0/
-cp INSTALL.txt release/M175-Studio-0.3.0/
-ditto -c -k --keepParent release/M175-Studio-0.3.0 M175_Studio_Mac_0.3.0_Universal.zip
-shasum -a 256 M175_Studio_Mac_0.3.0_Universal.zip
+mkdir -p release/M175-Studio-0.3.5
+cp -R "mac-build/M175 Studio.app" release/M175-Studio-0.3.5/
+cp INSTALL.txt release/M175-Studio-0.3.5/
+ditto -c -k --keepParent release/M175-Studio-0.3.5 M175_Studio_Mac_0.3.5_Universal.zip
+shasum -a 256 M175_Studio_Mac_0.3.5_Universal.zip
 ```
 
 This English revision is built from the recovered scan core and native source, translated and updated to preserve the compact 0.2.2 scan header. The original 0.2.1/0.2.2 patch sources were not recovered, so it is not an exact reproduction of the original Chinese package. On a real Mac, the native host uses installed Apple framework headers, avoiding the minimal cross-build ABI declaration issue reported for the old 0.2.0 package.

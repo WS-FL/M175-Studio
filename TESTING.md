@@ -40,3 +40,18 @@ Both architectures build and pass ad-hoc signature verification. Native launch o
 ## 0.3.3 sidebar display
 
 The browser harness checks wrapped English/Chinese names, complete IPv4/IPv6 text, a separate Connected label, visible dropdown arrow, and footer/navigation bounds at 1120/960 px widths and 665 px height. Very long names have a bounded scroll area. No personal scanned images are used.
+
+
+## 0.3.5 Files operations
+
+Run the Go race suite and `node tests/features-ui.cjs` as above. New UI cases use temporary documents and mocked copy/Trash responses, while Go tests verify file selection, mutation guards and unchanged contents after a simulated folder move. The browser suite includes filtered navigation, keyboard/toolbar/context rename, Command-C and native Copy routing, text-editing exclusions, Delete/Backspace confirmation, default cancellation, focus trapping, failure reporting, neighboring previews, empty results and reload.
+
+Run the native integration test on macOS to exercise actual NSPasteboard file URLs and NSFileManager Trash:
+
+```sh
+mkdir -p build
+xcrun clang -mmacosx-version-min=12.0 -fno-objc-arc -framework Cocoa native/FileActionsTest.m native/FileActions.m -o build/file-actions-test
+./build/file-actions-test
+```
+
+It uses an independently named clipboard and its own temporary scan folder. After verifying the returned Trash item's contents, it removes only that disposable test item. It does not read or overwrite the user's clipboard or scan history. Manually verify Command-C/paste in Finder and your target app, restore a disposable scan using Trash, and repeat on Intel hardware. Existing real scans must not be used for destructive tests.

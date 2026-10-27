@@ -82,6 +82,8 @@ type Connection struct {
 	IP           string `json:"ip"`
 }
 type appServer struct {
+	nativeHelper         string
+	fileAction           func(string, []string) error
 	mu                   sync.Mutex
 	settings             Settings
 	docs                 []Document
@@ -560,6 +562,27 @@ func (a *appServer) route(w http.ResponseWriter, r *http.Request) {
 			}
 			jsonOut(w, doc)
 			return
+		case "api/copy-files", "api/trash":
+			var req struct {
+				ID        string `json:"id"`
+				Confirmed bool   `json:"confirmed"`
+			}
+			if e := decode(r, &req); e != nil {
+				fail(w, 400, e)
+				return
+			}
+			var e error
+			if rel == "api/trash" {
+				e = a.trashDocument(req.ID, req.Confirmed)
+			} else {
+				e = a.copyDocument(req.ID)
+			}
+			if e != nil {
+				fail(w, 409, e)
+				return
+			}
+			jsonOut(w, map[string]bool{"ok": true})
+			return
 		case "api/settings":
 			var ss Settings
 			if e := decode(r, &ss); e != nil {
@@ -768,6 +791,7 @@ func main() {
 	watch := flag.Bool("watch-stdin", false, "exit when native parent closes its pipe")
 	ver := flag.Bool("version", false, "print version")
 	noDiscovery := flag.Bool("no-discovery", false, "disable LAN discovery for isolated UI tests")
+	helper := flag.String("native-helper", "", "installed native host for clipboard and Trash")
 	flag.Parse()
 	if *ver {
 		fmt.Println("M175 Studio", version)
@@ -782,6 +806,7 @@ func main() {
 	if e != nil {
 		log.Fatal(e)
 	}
+	a.nativeHelper = *helper
 	lock, e := os.OpenFile(filepath.Join(support, "instance.lock"), os.O_CREATE|os.O_RDWR, 0600)
 	if e != nil {
 		log.Fatal(e)
