@@ -101,9 +101,10 @@ func defaults() Settings {
 func cleanSettings(s Settings) (Settings, error) {
 	s.IP = strings.TrimSpace(s.IP)
 	ip := net.ParseIP(s.IP)
-	if ip == nil || (!ip.IsPrivate() && !ip.IsLoopback() && !ip.IsLinkLocalUnicast()) {
-		return s, errors.New("Enter a local network IP address, such as 192.168.5.44")
+	if !validPrinterIP(ip) {
+		return s, errors.New("Enter a valid printer IP address without a URL or port")
 	}
+	s.IP = ip.String()
 	if s.Port < 1 || s.Port > 65535 {
 		return s, errors.New("Port must be between 1 and 65535")
 	}

@@ -21,11 +21,11 @@ func TestSettingsValidation(t *testing.T) {
 	if _, e := cleanSettings(s); e != nil {
 		t.Fatal(e)
 	}
-	for _, ip := range []string{"8.8.8.8", "example.com", "http://192.168.5.44", ""} {
+	for _, ip := range []string{"0.0.0.0", "224.0.0.1", "255.255.255.255", "example.com", "http://192.168.5.44", ""} {
 		x := s
 		x.IP = ip
 		if _, e := cleanSettings(x); e == nil {
-			t.Fatal("accepted nonlocal IP", ip)
+			t.Fatal("accepted invalid IP", ip)
 		}
 	}
 	x := s
@@ -144,12 +144,13 @@ func TestSettingsRoundtrip(t *testing.T) {
 	s := a.settings
 	s.Paper = "A4"
 	s.Prefix = "Résumé"
+	s.IP = "198.51.100.6"
 	s.Output = t.TempDir()
 	if e = atomicJSON(filepath.Join(dir, "settings.json"), s); e != nil {
 		t.Fatal(e)
 	}
 	a, e = loadServer(dir)
-	if e != nil || a.settings.Prefix != "Résumé" || a.settings.Paper != "A4" {
+	if e != nil || a.settings.Prefix != "Résumé" || a.settings.Paper != "A4" || a.settings.IP != s.IP {
 		t.Fatal(e, a.settings)
 	}
 }

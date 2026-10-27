@@ -18,6 +18,7 @@ import (
 )
 
 type Device struct {
+	direct    bool   // saved/manual endpoint or individually advertised by Bonjour
 	IP        string `json:"ip"`
 	Port      int    `json:"port"`
 	Name      string `json:"name"`
@@ -175,11 +176,11 @@ func bonjourCandidates(ctx context.Context) []Device {
 				}
 				for _, addr := range ips {
 					ip := addr.IP.To4()
-					if ip == nil || !(ip.IsPrivate() || ip.IsLinkLocalUnicast()) {
+					if !validPrinterIP(ip) {
 						continue
 					}
 					mu.Lock()
-					out = append(out, Device{IP: ip.String(), Port: 8289, Name: i.name})
+					out = append(out, Device{IP: ip.String(), Port: 8289, Name: i.name, direct: true})
 					mu.Unlock()
 				}
 			}
@@ -235,8 +236,7 @@ func subnetCandidates() []Device {
 func findDevices(ctx context.Context, candidates []Device, probe func(context.Context, Device) (Device, bool)) []Device {
 	unique := map[string]Device{}
 	for _, d := range candidates {
-		ip := net.ParseIP(d.IP)
-		if ip == nil || !(ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast()) {
+		if !discoveryAddressAllowed(d) {
 			continue
 		}
 		key := net.JoinHostPort(d.IP, strconv.Itoa(d.Port))
@@ -315,7 +315,7 @@ func (a *appServer) discover() error {
 	a.mu.Unlock()
 	go func() {
 		defer cancel()
-		candidates := []Device{{IP: ss.IP, Port: ss.Port}}
+		candidates := []Device{{IP: ss.IP, Port: ss.Port, direct: true}}
 		candidates = append(candidates, bonjourCandidates(ctx)...)
 		candidates = append(candidates, subnetCandidates()...)
 		devices := findDevices(ctx, candidates, probeScanner)

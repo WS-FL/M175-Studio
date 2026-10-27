@@ -28,3 +28,15 @@ Hardware acceptance still requires: grant/deny Local Network permission, find th
 
 
 0.3.1 adds long English, Chinese and unusually long Bonjour-name layout checks at 1120px and 960px widths, including effective ellipsis, card bounds, visible dropdown arrow and full-name tooltips.
+
+
+## 0.3.2 address regression
+
+Settings and scan-engine validation now share unicast-IP rules. Tests use the documentation-only address 198.51.100.6 for campus-like networks; no test contacts that address. Coverage includes saved settings reload, direct endpoint discovery, rejection of public range candidates, invalid/broadcast/multicast endpoints, and a canceled status request reaching the HTTP transport. The browser harness exercises the real settings API with a mocked connection-check response, then verifies persistence/reload alongside all existing rename/history/layout scenarios. Set M175_TEST_BROWSER to an installed Chromium-family executable when the Playwright-managed browser is unavailable; it runs headlessly in an isolated profile.
+
+Both architectures build and pass ad-hoc signature verification. Native launch on Apple Silicon preserves existing history. Real-printer checks in this environment were refused at the requested scan port; no physical scan was started. Intel execution and successful scanning on the new network remain unverified.
+
+
+## 0.3.3 sidebar display
+
+The browser harness checks wrapped English/Chinese names, complete IPv4/IPv6 text, a separate Connected label, visible dropdown arrow, and footer/navigation bounds at 1120/960 px widths and 665 px height. Very long names have a bounded scroll area. No personal scanned images are used.

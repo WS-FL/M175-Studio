@@ -97,7 +97,7 @@ function updateElapsed(){
 }
 function renderState(s){
   const previous=appState;appState=s;if(previous&&currentTab!=='settings'&&(previous.settings.ip!==s.settings.ip||previous.settings.port!==s.settings.port)){ $('settingIP').value=s.settings.ip;$('settingPort').value=s.settings.port;}if(!initialized){populateSettings(s.settings);initialized=true;if(s.documents.length)selectDocument(s.documents[0].id);}
-  $('version').textContent=s.version;$('sideIP').textContent=s.settings.ip;$('docCount').textContent=s.documents.length;
+  $('version').textContent=s.version;$('docCount').textContent=s.documents.length;
   $('outputShort').textContent=s.settings.output.replace(/^\/Users\/[^/]+\//,'').replaceAll('/',' / ');$('outputShort').title=s.settings.output;
   renderDevices(s);
   const c=s.connection,online=c.status==='online';
@@ -134,7 +134,8 @@ function renderDevices(s){
   $('deviceToggle').title=deviceName+' · '+s.settings.ip+':'+s.settings.port;
   $('sideIP').title=s.settings.ip+':'+s.settings.port;
   $('deviceSelect').title=deviceName+' · '+s.settings.ip+':'+s.settings.port;
-  $('sideIP').textContent=discovery.busy?'Searching…':s.connection.status==='online'?'Connected · '+s.settings.ip:devices.length?'No supported scanner connected':'No devices found';
+  $('sideStatus').textContent=discovery.busy?'Searching…':s.connection.status==='online'?'Connected':devices.length?'No supported scanner connected':'No devices found';
+  $('sideIP').textContent=s.settings.ip;
   $('discoveryMessage').textContent=discovery.busy?'Searching the local network…':discovery.message||'Use Refresh to search for scanners.';
   const options=JSON.stringify([devices,s.settings.ip,s.settings.port]);
   if($('deviceSelect').dataset.signature!==options){

@@ -26,7 +26,7 @@ import (
 	"time"
 )
 
-const version = "0.3.1 beta"
+const version = "0.3.3 beta"
 const scanNS = "http://tempuri.org/wscn.xsd"
 const maxResponse = 128 << 20
 
@@ -532,8 +532,8 @@ func run(cfg config) (result, runDir string, err error) {
 
 func runWith(ctx context.Context, cfg config, progress io.Writer) (result, runDir string, err error) {
 	ip := net.ParseIP(cfg.IP)
-	if ip == nil || (!ip.IsPrivate() && !ip.IsLoopback() && !ip.IsLinkLocalUnicast()) {
-		return "", "", errors.New("printer must be a local/private IP address")
+	if !validPrinterIP(ip) {
+		return "", "", errors.New("printer must be a valid unicast IP address")
 	}
 	if cfg.Port < 1 || cfg.Port > 65535 {
 		return "", "", errors.New("invalid port")
