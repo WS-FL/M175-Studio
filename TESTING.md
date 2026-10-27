@@ -55,3 +55,8 @@ xcrun clang -mmacosx-version-min=12.0 -fno-objc-arc -framework Cocoa native/File
 ```
 
 It uses an independently named clipboard and its own temporary scan folder. After verifying the returned Trash item's contents, it removes only that disposable test item. It does not read or overwrite the user's clipboard or scan history. Manually verify Command-C/paste in Finder and your target app, restore a disposable scan using Trash, and repeat on Intel hardware. Existing real scans must not be used for destructive tests.
+
+
+## 0.3.6 multiple selection
+
+Run `node tests/multiselect-ui.cjs` after the existing UI suite, using the same isolated browser setup. Five disposable documents cover Command-toggle, Shift ranges in both directions, Command-Shift union, Shift-arrow extension, polling, batch copy routes, context selection, confirmation names/count/default cancel, filtered selections, partial failure/retry and empty-history reload. Trash responses in this browser test move only its own fixture directories; Go tests separately validate one clipboard write, mixed PDF/JPEG payloads, deduplication, full preflight before mutations and exact partial outcomes. Existing native file URL and Trash integration tests remain applicable.

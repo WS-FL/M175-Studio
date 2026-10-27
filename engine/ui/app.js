@@ -2,6 +2,7 @@
 const $ = id => document.getElementById(id);
 let editingTitle = null;
 let trashTarget = null, fileActionBusy = false;
+let selectedIDs = new Set(), selectionAnchor = "";
 let appState = null, initialized = false, currentTab = 'scan', source = 'platen';
 let selectedID = '', pageIndex = 0, rotation = 0, previewSignature = '', listSignature = '', lastCompleted = '';
 let requestBusy = false, toastTimer = 0, unavailableCount = 0, lastLog = '', chosenPath = '';
@@ -52,7 +53,23 @@ window.studioShowSettings = () => switchTab('settings');
 function formatDate(s){let d=new Date(s);return isNaN(d)?s:d.toLocaleString('en-US',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false});}
 function sizeText(bytes){return bytes<1048576?(bytes/1024).toFixed(0)+' KB':(bytes/1048576).toFixed(1)+' MB';}
 function asset(doc,name){return 'asset/'+encodeURIComponent(doc.id)+'/'+encodeURIComponent(name);}
-function selectDocument(id){selectedID=id;pageIndex=0;rotation=0;previewSignature='';listSignature='';renderFiles();renderPreview();}
+function selectDocument(id){selectedIDs=new Set(id?[id]:[]);selectionAnchor=id;previewDocument(id);}
+function previewDocument(id){selectedID=id;pageIndex=0;rotation=0;previewSignature='';listSignature='';renderFiles();renderPreview();}
+function selectedDocuments(){return visibleDocuments().filter(d=>selectedIDs.has(d.id));}
+function selectionPayload(docs){return docs.length===1?{id:docs[0].id}:{ids:docs.map(d=>d.id)};}
+function chooseDocument(id,event={}){
+  const docs=visibleDocuments(),ids=docs.map(d=>d.id);
+  if(event.shiftKey){
+    let anchor=ids.indexOf(selectionAnchor);if(anchor<0)anchor=Math.max(0,ids.indexOf(selectedID));
+    const index=ids.indexOf(id);if(index<0)return;
+    const range=ids.slice(Math.min(anchor,index),Math.max(anchor,index)+1);
+    selectedIDs=new Set(event.metaKey?[...selectedIDs,...range]:range);
+    selectionAnchor=ids[anchor];previewDocument(id);
+  }else if(event.metaKey){
+    if(selectedIDs.has(id))selectedIDs.delete(id);else selectedIDs.add(id);
+    selectionAnchor=id;previewDocument(selectedIDs.has(id)?id:(docs.find(d=>selectedIDs.has(d.id))?.id||''));
+  }else selectDocument(id);
+}
 function currentDocument(){return appState?.documents?.find(d=>d.id===selectedID)||null;}
 function visibleDocuments(){
   const q=$('fileSearch').value.trim().toLocaleLowerCase();
@@ -61,16 +78,22 @@ function visibleDocuments(){
 function renderFiles(){
   if(!appState)return;const q=$('fileSearch').value.trim().toLocaleLowerCase();
   const docs=visibleDocuments();
-  ['renameFile','copyFile','trashFile'].forEach(id=>$(id).disabled=!currentDocument()||appState.job.busy||fileActionBusy);
+  const count=selectedDocuments().length,blocked=appState.job.busy||fileActionBusy;
+  $('renameFile').disabled=count!==1||blocked;
+  ['copyFile','trashFile'].forEach(id=>$(id).disabled=count===0||blocked);
+  $('copyFile').textContent=count>1?'Copy ('+count+')':'Copy';$('trashFile').textContent=count>1?'Trash ('+count+')…':'Trash…';
+  $('selectionCount').textContent=count?count+' selected':'';
 
-  const signature=JSON.stringify([docs,selectedID,q]);if(signature===listSignature)return;listSignature=signature;
+
+  const signature=JSON.stringify([docs,selectedID,[...selectedIDs],q]);if(signature===listSignature)return;listSignature=signature;
   const list=$('documentList');const scroll=list.scrollTop,hadFocus=list.contains(document.activeElement);list.replaceChildren();
   if(!docs.length){let p=document.createElement('div');p.className='empty-list';p.textContent=q?'No matching documents.':'No scans yet.\nYour first scan will appear here.';list.append(p);}
   docs.forEach(doc=>{
-    const row=document.createElement('button');row.className='document-item'+(doc.id===selectedID?' active':'');row.setAttribute('aria-label',doc.title);row.setAttribute('aria-pressed',String(doc.id===selectedID));row.dataset.id=doc.id;row.tabIndex=doc.id===selectedID||!docs.some(d=>d.id===selectedID)?0:-1;
-    row.addEventListener('click',()=>{selectDocument(doc.id);focusDocument();});
+    const row=document.createElement('button');row.className='document-item'+(selectedIDs.has(doc.id)?' active':'');row.setAttribute('aria-label',doc.title);row.setAttribute('aria-pressed',String(selectedIDs.has(doc.id)));row.dataset.id=doc.id;row.tabIndex=doc.id===selectedID||!docs.some(d=>d.id===selectedID)?0:-1;
+    row.addEventListener('mousedown',e=>{if(e.shiftKey)e.preventDefault();});
+    row.addEventListener('click',e=>{chooseDocument(doc.id,e);focusDocument();});
     row.addEventListener('dblclick',beginRename);
-    row.addEventListener('contextmenu',e=>{e.preventDefault();selectDocument(doc.id);showFileMenu(e.clientX,e.clientY);});
+    row.addEventListener('contextmenu',e=>{e.preventDefault();if(selectedIDs.has(doc.id))previewDocument(doc.id);else selectDocument(doc.id);showFileMenu(e.clientX,e.clientY);});
     const im=document.createElement('img');im.className='document-thumb';im.src=asset(doc,doc.pages[0]);im.loading='lazy';im.alt='';
     const info=document.createElement('div'),title=document.createElement('strong'),meta=document.createElement('small');title.textContent=doc.title;title.title=doc.title;
     meta.textContent=formatDate(doc.created)+' · '+doc.pages.length+' pages - '+(doc.pdf?'PDF':'JPEG');info.append(title,meta);
@@ -83,7 +106,7 @@ function renderPreview(){
   const signature=JSON.stringify([doc?.id,pageIndex,rotation,$('zoom').value,has?doc.pages[pageIndex]:'']);
   $('previewEmpty').classList.toggle('hidden',has);$('previewImage').classList.toggle('hidden',!has);
   $('previewTitle').textContent=has?doc.title:'Page Preview';$('previewTitle').title=has?'Click to rename · '+doc.title:'';
-  $('previewTitle').setAttribute('aria-disabled',String(!has||Boolean(appState?.job?.busy)));
+  $('previewTitle').setAttribute('aria-disabled',String(!has||Boolean(appState?.job?.busy)||(currentTab==='files'&&selectedDocuments().length!==1)));
   $('previewTitle').classList.toggle('hidden',Boolean(editingTitle));
   $('previewMeta').textContent=has?doc.paper+' · '+doc.dpi+' dpi · '+(doc.mode==='gray'?'Grayscale':'Color')+' · '+sizeText(doc.bytes):'Available after scanning';
   $('pageNumber').textContent=has?(pageIndex+1)+' / '+doc.pages.length:'0 / 0';
@@ -106,7 +129,7 @@ function updateElapsed(){
   $('taskTime').textContent=Number.isFinite(elapsed)?(elapsed<60?elapsed+' sec':Math.floor(elapsed/60)+' min '+elapsed%60+' sec'):'';
 }
 function renderState(s){
-  const previous=appState;appState=s;if(previous&&currentTab!=='settings'&&(previous.settings.ip!==s.settings.ip||previous.settings.port!==s.settings.port)){ $('settingIP').value=s.settings.ip;$('settingPort').value=s.settings.port;}if(!initialized){populateSettings(s.settings);initialized=true;if(s.documents.length)selectDocument(s.documents[0].id);}
+  const previous=appState;appState=s;selectedIDs=new Set([...selectedIDs].filter(id=>s.documents.some(d=>d.id===id)));if(selectedID&&!s.documents.some(d=>d.id===selectedID))selectedID=[...selectedIDs][0]||'';if(previous&&currentTab!=='settings'&&(previous.settings.ip!==s.settings.ip||previous.settings.port!==s.settings.port)){ $('settingIP').value=s.settings.ip;$('settingPort').value=s.settings.port;}if(!initialized){populateSettings(s.settings);initialized=true;if(s.documents.length)selectDocument(s.documents[0].id);}
   $('version').textContent=s.version;$('docCount').textContent=s.documents.length;
   $('outputShort').textContent=s.settings.output.replace(/^\/Users\/[^/]+\//,'').replaceAll('/',' / ');$('outputShort').title=s.settings.output;
   renderDevices(s);
@@ -157,7 +180,7 @@ function renderDevices(s){
   $('discoverDevices').disabled=Boolean(discovery.busy||s.job.busy);
 }
 function beginRename(){
-  const doc=currentDocument();if(!doc||editingTitle||appState?.job?.busy||fileActionBusy||trashTarget)return;
+  const doc=currentDocument();if((currentTab==='files'&&selectedDocuments().length!==1)||!doc||editingTitle||appState?.job?.busy||fileActionBusy||trashTarget)return;
   editingTitle={id:doc.id,title:doc.title};$('titleEdit').value=doc.title;$('titleEdit').classList.remove('hidden');$('previewTitle').classList.add('hidden');$('titleEdit').focus();$('titleEdit').select();
 }
 async function finishRename(cancel=false){
@@ -178,13 +201,16 @@ function showFileMenu(x,y){
   const menu=$('fileMenu');menu.classList.remove('hidden');
   menu.style.left=Math.max(8,Math.min(x,innerWidth-menu.offsetWidth-8))+'px';
   menu.style.top=Math.max(8,Math.min(y,innerHeight-menu.offsetHeight-8))+'px';
-  menu.querySelector('[data-file-action="copy"]').firstChild.textContent=currentDocument()?.pdf?'Copy PDF ':'Copy Images ';
-  menu.querySelector('button').focus();
+  const count=selectedDocuments().length;
+  menu.querySelector('[data-file-action="rename"]').disabled=count!==1;
+  menu.querySelector('[data-file-action="copy"]').firstChild.textContent=count>1?'Copy '+count+' Documents ':currentDocument()?.pdf?'Copy PDF ':'Copy Images ';
+  menu.querySelector('[data-file-action="trash"]').firstChild.textContent=count>1?'Move '+count+' to Trash… ':'Move to Trash… ';
+  menu.querySelector('button:not(:disabled)').focus();
 }
 async function copyDocument(){
-  const doc=currentDocument();if(!doc||appState?.job?.busy||fileActionBusy||trashTarget)return;
+  const docs=selectedDocuments();if(!docs.length||appState?.job?.busy||fileActionBusy||trashTarget)return;
   fileActionBusy=true;renderFiles();
-  try{await api('copy-files',{id:doc.id});toast(doc.pdf?'PDF copied. Paste it in Finder or another app.':'Original images copied. Paste them in Finder or another app.');}
+  try{await api('copy-files',selectionPayload(docs));toast(docs.length>1?docs.length+' documents copied. Paste them in Finder or another app.':docs[0].pdf?'PDF copied. Paste it in Finder or another app.':'Original images copied. Paste them in Finder or another app.');}
   catch(e){toast('Copy failed: '+e.message,true);}
   finally{fileActionBusy=false;renderFiles();}
 }
@@ -192,10 +218,13 @@ window.studioCopySelection = () => {
   if(currentTab!=='files'||editableTarget(document.activeElement)||trashTarget||String(window.getSelection()).length||!currentDocument())return false;
   closeFileMenu();copyDocument();return true;
 };
+function showTrashTargets(){
+  $('trashHeading').textContent=trashTarget.length>1?'Move '+trashTarget.length+' documents to Trash?':'Move document to Trash?';
+  $('trashName').textContent=trashTarget.map(d=>d.title).join('\n');
+}
 function askTrash(){
-  const doc=currentDocument();if(!doc||appState?.job?.busy||fileActionBusy||trashTarget)return;
-  closeFileMenu();trashTarget={id:doc.id,title:doc.title};
-  $('trashName').textContent=doc.title;$('trashError').textContent='';
+  const docs=selectedDocuments();if(!docs.length||appState?.job?.busy||fileActionBusy||trashTarget)return;
+  closeFileMenu();trashTarget=docs.map(d=>({id:d.id,title:d.title}));showTrashTargets();$('trashError').textContent='';
   $('trashDialog').classList.remove('hidden');$('cancelTrash').focus();
 }
 function cancelTrash(){
@@ -203,16 +232,26 @@ function cancelTrash(){
 }
 async function confirmTrash(){
   if(!trashTarget||fileActionBusy)return;
-  const target=trashTarget,docs=visibleDocuments(),idx=docs.findIndex(d=>d.id===target.id);
-  const next=docs[idx+1]||docs[idx-1];fileActionBusy=true;
+  const targets=trashTarget.slice(),ids=new Set(targets.map(d=>d.id)),docs=visibleDocuments();
+  const idx=docs.findIndex(d=>d.id===selectedID),remaining=docs.filter(d=>!ids.has(d.id));
+  const next=docs.slice(idx+1).find(d=>!ids.has(d.id))||remaining[remaining.length-1];fileActionBusy=true;
   $('confirmTrash').disabled=true;$('cancelTrash').disabled=true;renderFiles();
   try{
-    await api('trash',{id:target.id,confirmed:true});
-    // Once Trash succeeds, never leave a second confirmation for this document.
-    trashTarget=null;$('trashDialog').classList.add('hidden');
-    appState.documents=appState.documents.filter(d=>d.id!==target.id);selectDocument(next?.id||'');
-    renderState(await api('state'));focusDocument();toast('Moved “'+target.title+'” to Trash.');
-  }catch(e){if(trashTarget)$('trashError').textContent=e.message;else toast('Moved to Trash. Refresh history to update the list.',true);}
+    const result=await api('trash',{...selectionPayload(targets),confirmed:true});
+    const moved=new Set(result.moved||targets.map(d=>d.id));
+    appState.documents=appState.documents.filter(d=>!moved.has(d.id));
+    const failed=targets.filter(d=>!moved.has(d.id));
+    if(failed.length){
+      // Retry can only target the remaining items, never already moved documents.
+      trashTarget=failed;selectedIDs=new Set(failed.map(d=>d.id));previewDocument(failed[0].id);showTrashTargets();
+      $('trashError').textContent=moved.size+' moved to Trash; '+failed.length+' could not be moved. '+Object.values(result.failed||{}).join(' ');
+    }else{
+      trashTarget=null;$('trashDialog').classList.add('hidden');selectDocument(next?.id||'');
+      toast(targets.length>1?'Moved '+targets.length+' documents to Trash.':'Moved “'+targets[0].title+'” to Trash.');
+    }
+    try{renderState(await api('state'));}catch(e){toast('File operation finished. Refresh history to update the list.',true);}
+    if(!trashTarget)focusDocument();
+  }catch(e){if(trashTarget)$('trashError').textContent=e.message;}
   finally{fileActionBusy=false;$('confirmTrash').disabled=false;$('cancelTrash').disabled=false;renderFiles();}
 }
 function fileKeys(e){
@@ -222,16 +261,16 @@ function fileKeys(e){
     return;
   }
   if(!$('fileMenu').classList.contains('hidden')){
-    const buttons=[...$('fileMenu').querySelectorAll('button')];
+    const buttons=[...$('fileMenu').querySelectorAll('button:not(:disabled)')];
     if(e.key==='Escape'||e.key==='Tab'){e.preventDefault();closeFileMenu();focusDocument(false);}
     else if(['ArrowDown','ArrowUp'].includes(e.key)){e.preventDefault();const idx=buttons.indexOf(document.activeElement);buttons[(idx+(e.key==='ArrowDown'?1:buttons.length-1))%buttons.length].focus();}
     return;
   }
-  if(e.defaultPrevented||currentTab!=='files'||editableTarget(e.target)||e.target.closest('nav')||e.isComposing||e.metaKey||e.ctrlKey||e.altKey||e.shiftKey)return;
+  if(e.defaultPrevented||currentTab!=='files'||editableTarget(e.target)||e.target.closest('nav')||e.isComposing||e.metaKey||e.ctrlKey||e.altKey)return;
   if(['ArrowUp','ArrowDown'].includes(e.key)){
     e.preventDefault();const docs=visibleDocuments();if(!docs.length)return;
     const idx=docs.findIndex(d=>d.id===selectedID),next=idx<0?0:Math.max(0,Math.min(docs.length-1,idx+(e.key==='ArrowDown'?1:-1)));
-    selectDocument(docs[next].id);focusDocument();
+    chooseDocument(docs[next].id,e);focusDocument();
   }else if((e.key==='Enter'&&e.target.closest('.document-item'))||e.key==='F2'){e.preventDefault();beginRename();}
   else if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();askTrash();}
   else if(e.key==='ContextMenu'){e.preventDefault();const row=[...$('documentList').children].find(el=>el.dataset.id===selectedID);if(row){const b=row.getBoundingClientRect();showFileMenu(b.left,b.top);}}
@@ -273,7 +312,10 @@ function bind(){
   $('saveSettings').addEventListener('click',async()=>{try{await save();}catch(e){toast(e.message,true);}});
   $('changeOutput').addEventListener('click',()=>{switchTab('settings');$('settingOutput').focus();});
   $('chooseFolder').addEventListener('click',()=>{if(!native('chooseFolder',{path:$('settingOutput').value}))toast('The system folder picker is unavailable in a test browser. Enter an absolute path instead.',true);});
-  $('fileSearch').addEventListener('input',()=>{renderFiles();const docs=visibleDocuments();if(!docs.some(d=>d.id===selectedID))selectDocument(docs[0]?.id||'');});
+  $('fileSearch').addEventListener('input',()=>{
+    const docs=visibleDocuments();selectedIDs=new Set(docs.filter(d=>selectedIDs.has(d.id)).map(d=>d.id));
+    selectionAnchor='';if(!selectedIDs.size)selectDocument(docs[0]?.id||'');else previewDocument(selectedIDs.has(selectedID)?selectedID:[...selectedIDs][0]);
+  });
   $('refreshFiles').addEventListener('click',async()=>{try{await api('refresh',{});renderState(await api('state'));toast('Scan history refreshed.');}catch(e){toast(e.message,true);}});
   $('prevPage').addEventListener('click',()=>{pageIndex--;rotation=0;renderPreview();});$('nextPage').addEventListener('click',()=>{pageIndex++;rotation=0;renderPreview();});
   $('previewImage').addEventListener('load',applyZoom);$('previewImage').addEventListener('error',()=>{if(currentDocument())toast('Cannot read this image. It may have been moved. Refresh scan history.',true);});

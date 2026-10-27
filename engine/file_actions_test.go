@@ -158,3 +158,117 @@ func TestFileActionHTTPGuards(t *testing.T) {
 		t.Fatal("unguarded file operation", calls)
 	}
 }
+
+func TestBatchCopyMixedFormatsAndDedupe(t *testing.T) {
+	a := fileActionFixture(t)
+	dir := filepath.Join(a.settings.Output, "scan-another")
+	os.Remove(filepath.Join(dir, "old.pdf"))
+	os.WriteFile(filepath.Join(dir, "page-002.jpg"), sampleJPEG(t), 0600)
+	a.docs = listDocuments(a.settings.Output)
+	calls := 0
+	a.fileAction = func(action string, paths []string) error {
+		calls++
+		want := []string{filepath.Join(a.settings.Output, "scan-old", "old.pdf"), filepath.Join(dir, "page-001.jpg"), filepath.Join(dir, "page-002.jpg")}
+		if action != "copy-files" || !reflect.DeepEqual(paths, want) {
+			t.Fatal(action, paths)
+		}
+		return nil
+	}
+	if err := a.copyDocuments([]string{"scan-old", "scan-another", "scan-old"}); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 1 {
+		t.Fatal("clipboard replaced instead of one batch", calls)
+	}
+}
+func TestBatchPreflightAndConfirmation(t *testing.T) {
+	a := fileActionFixture(t)
+	calls := 0
+	a.fileAction = func(string, []string) error { calls++; return nil }
+	for _, ids := range [][]string{nil, {}, {"scan-old", "scan-missing"}, {"scan-old", "../bad"}, make([]string, 201)} {
+		if a.copyDocuments(ids) == nil {
+			t.Fatal("invalid copy accepted", ids)
+		}
+		if _, err := a.trashDocuments(ids, true); err == nil {
+			t.Fatal("invalid Trash accepted", ids)
+		}
+	}
+	if _, err := a.trashDocuments([]string{"scan-old", "scan-another"}, false); err == nil {
+		t.Fatal("unconfirmed batch")
+	}
+	a.job.Busy = true
+	if a.copyDocuments([]string{"scan-old", "scan-another"}) == nil {
+		t.Fatal("copy while busy")
+	}
+	if _, err := a.trashDocuments([]string{"scan-old", "scan-another"}, true); err == nil {
+		t.Fatal("Trash while busy")
+	}
+	if calls != 0 {
+		t.Fatal("mutation before whole-selection validation", calls)
+	}
+}
+func TestBatchTrashPartialFailureAndRetry(t *testing.T) {
+	a := fileActionFixture(t)
+	trash := t.TempDir()
+	failSecond := true
+	calls := []string{}
+	a.fileAction = func(action string, paths []string) error {
+		id := filepath.Base(paths[0])
+		calls = append(calls, id)
+		if failSecond && id == "scan-another" {
+			return errors.New("Permission denied")
+		}
+		return os.Rename(paths[0], filepath.Join(trash, id))
+	}
+	result, err := a.trashDocuments([]string{"scan-old", "scan-another", "scan-old"}, true)
+	if err != nil || !reflect.DeepEqual(result.Moved, []string{"scan-old"}) || result.Failed["scan-another"] != "Permission denied" {
+		t.Fatal(result, err)
+	}
+	if len(a.docs) != 1 || a.docs[0].ID != "scan-another" {
+		t.Fatal(a.docs)
+	}
+	failSecond = false
+	result, err = a.trashDocuments([]string{"scan-another"}, true)
+	if err != nil || len(result.Moved) != 1 || len(result.Failed) != 0 || len(a.docs) != 0 {
+		t.Fatal(result, err, a.docs)
+	}
+	if !reflect.DeepEqual(calls, []string{"scan-old", "scan-another", "scan-another"}) {
+		t.Fatal(calls)
+	}
+	for _, id := range []string{"scan-old", "scan-another"} {
+		b, err := os.ReadFile(filepath.Join(trash, id, "old.pdf"))
+		if err != nil || string(b) != "pdf-original" {
+			t.Fatal("original lost", id, err)
+		}
+	}
+}
+func TestBatchFileHTTP(t *testing.T) {
+	a := fileActionFixture(t)
+	a.host = "127.0.0.1:12345"
+	a.token = "test"
+	calls := 0
+	a.fileAction = func(string, []string) error { calls++; return errors.New("native test failure") }
+	for _, tc := range []struct {
+		path, body string
+		want       int
+	}{
+		{"copy-files", `{"ids":[]}`, 409},
+		{"copy-files", `{"id":"scan-old","ids":["scan-another"]}`, 400},
+		{"trash", `{"ids":["scan-old","scan-another"]}`, 409},
+		{"trash", `{"ids":["scan-old","scan-another"],"confirmed":true}`, 200},
+	} {
+		r := httptest.NewRequest("POST", "http://"+a.host+"/s/test/api/"+tc.path, strings.NewReader(tc.body))
+		r.Header.Set("X-M175-Request", "1")
+		w := httptest.NewRecorder()
+		a.route(w, r)
+		if w.Code != tc.want {
+			t.Fatal(tc, w.Code, w.Body.String())
+		}
+		if tc.want == 200 && !strings.Contains(w.Body.String(), `"failed":{"scan-another":"native test failure","scan-old":"native test failure"}`) {
+			t.Fatal(w.Body.String())
+		}
+	}
+	if calls != 2 {
+		t.Fatal(calls)
+	}
+}

@@ -564,22 +564,43 @@ func (a *appServer) route(w http.ResponseWriter, r *http.Request) {
 			return
 		case "api/copy-files", "api/trash":
 			var req struct {
-				ID        string `json:"id"`
-				Confirmed bool   `json:"confirmed"`
+				ID        string   `json:"id"`
+				IDs       []string `json:"ids"`
+				Confirmed bool     `json:"confirmed"`
 			}
 			if e := decode(r, &req); e != nil {
 				fail(w, 400, e)
 				return
 			}
-			var e error
-			if rel == "api/trash" {
-				e = a.trashDocument(req.ID, req.Confirmed)
-			} else {
-				e = a.copyDocument(req.ID)
-			}
-			if e != nil {
-				fail(w, 409, e)
+			if req.ID != "" && req.IDs != nil {
+				fail(w, 400, errors.New("Use either id or ids"))
 				return
+			}
+			if req.IDs != nil {
+				if rel == "api/trash" {
+					result, e := a.trashDocuments(req.IDs, req.Confirmed)
+					if e != nil {
+						fail(w, 409, e)
+						return
+					}
+					jsonOut(w, result)
+					return
+				}
+				if e := a.copyDocuments(req.IDs); e != nil {
+					fail(w, 409, e)
+					return
+				}
+			} else {
+				var e error
+				if rel == "api/trash" {
+					e = a.trashDocument(req.ID, req.Confirmed)
+				} else {
+					e = a.copyDocument(req.ID)
+				}
+				if e != nil {
+					fail(w, 409, e)
+					return
+				}
 			}
 			jsonOut(w, map[string]bool{"ok": true})
 			return

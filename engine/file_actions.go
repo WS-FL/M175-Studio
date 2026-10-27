@@ -61,51 +61,98 @@ func (a *appServer) performFileAction(action string, paths []string) error {
 	return nil
 }
 
-func (a *appServer) copyDocument(id string) error {
+// Validate the whole selection before touching the clipboard or any folder.
+func (a *appServer) fileActionSelection(ids []string) ([]Document, []string, error) {
+	if len(ids) == 0 || len(ids) > 200 {
+		return nil, nil, errors.New("Select between 1 and 200 documents")
+	}
+	docs := []Document{}
+	dirs := []string{}
+	seen := map[string]bool{}
+	for _, id := range ids {
+		if seen[id] {
+			continue
+		}
+		seen[id] = true
+		doc, dir, err := a.fileActionDocument(id)
+		if err != nil {
+			return nil, nil, err
+		}
+		docs = append(docs, doc)
+		dirs = append(dirs, dir)
+	}
+	return docs, dirs, nil
+}
+func (a *appServer) copyDocument(id string) error { return a.copyDocuments([]string{id}) }
+func (a *appServer) copyDocuments(ids []string) error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	doc, dir, err := a.fileActionDocument(id)
+	docs, dirs, err := a.fileActionSelection(ids)
 	if err != nil {
 		return err
 	}
-	names := doc.Pages
-	if doc.PDF != "" {
-		names = []string{doc.PDF}
-	}
-	if len(names) == 0 {
-		return errors.New("This document has no files to copy")
-	}
-	paths := make([]string, 0, len(names))
-	for _, name := range names {
-		if name == "" || filepath.Base(name) != name {
-			return errors.New("Invalid document file")
+	paths := []string{}
+	for i, doc := range docs {
+		names := doc.Pages
+		if doc.PDF != "" {
+			names = []string{doc.PDF}
 		}
-		path := filepath.Join(dir, name)
-		st, err := os.Lstat(path)
-		if err != nil {
-			return err
+		if len(names) == 0 {
+			return errors.New("This document has no files to copy")
 		}
-		if !st.Mode().IsRegular() {
-			return errors.New("Invalid document file")
+		for _, name := range names {
+			if name == "" || filepath.Base(name) != name {
+				return errors.New("Invalid document file")
+			}
+			path := filepath.Join(dirs[i], name)
+			st, err := os.Lstat(path)
+			if err != nil {
+				return err
+			}
+			if !st.Mode().IsRegular() {
+				return errors.New("Invalid document file")
+			}
+			paths = append(paths, path)
 		}
-		paths = append(paths, path)
 	}
+	// One write publishes the full batch; per-document writes would replace it.
 	return a.performFileAction("copy-files", paths)
 }
 
+type TrashResult struct {
+	Moved  []string          `json:"moved"`
+	Failed map[string]string `json:"failed"`
+}
+
 func (a *appServer) trashDocument(id string, confirmed bool) error {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	if !confirmed {
-		return errors.New("Confirm moving this document to Trash first")
-	}
-	_, dir, err := a.fileActionDocument(id)
+	result, err := a.trashDocuments([]string{id}, confirmed)
 	if err != nil {
 		return err
 	}
-	if err = a.performFileAction("trash-folder", []string{dir}); err != nil {
-		return err
+	if message := result.Failed[id]; message != "" {
+		return errors.New(message)
 	}
-	a.docs = listDocuments(a.settings.Output)
 	return nil
+}
+func (a *appServer) trashDocuments(ids []string, confirmed bool) (TrashResult, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	result := TrashResult{Moved: []string{}, Failed: map[string]string{}}
+	if !confirmed {
+		return result, errors.New("Confirm moving these documents to Trash first")
+	}
+	docs, dirs, err := a.fileActionSelection(ids)
+	if err != nil {
+		return result, err
+	}
+	for i, doc := range docs {
+		if err := a.performFileAction("trash-folder", []string{dirs[i]}); err != nil {
+			result.Failed[doc.ID] = err.Error()
+		} else {
+			result.Moved = append(result.Moved, doc.ID)
+		}
+	}
+	// A batch can partially succeed. Return exact outcomes and retain failed files.
+	a.docs = listDocuments(a.settings.Output)
+	return result, nil
 }
