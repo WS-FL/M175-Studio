@@ -61,7 +61,7 @@ static NSString *JSString(NSString *s){
 - (void)showStartupError:(NSString*)message{
     if(failed)return;failed=YES;if(readyTimer){[readyTimer invalidate];readyTimer=nil;}
     // The dynamic message is passed as JSON text, not interpolated as HTML.
-    [web loadHTMLString:@"<!doctype html><meta charset='utf-8'><style>body{font:14px/1.8 -apple-system,sans-serif;background:#f6f8f2;color:#465b3d;margin:70px;max-width:760px}h1{font-size:26px;font-weight:600}pre{white-space:pre-wrap;word-break:break-word;background:#edf1e8;padding:20px;border-radius:10px;color:#89947d;font-size:12px}</style><h1>M175 Studio could not start</h1><p>The scan engine did not become ready. Quit the app, move the entire M175 Studio.app into Applications and open it again.</p><p>Keep the app bundle intact. Detailed errors are recorded in:</p><pre>~/Library/Logs/M175 Studio/engine.log</pre><p>If macOS cannot verify the developer, review the exact message in System Settings > Privacy & Security.</p>" baseURL:nil];
+    [web loadHTMLString:@"<!doctype html><meta charset='utf-8'><style>body{font:14px/1.8 -apple-system,sans-serif;background:#f3f5f7;color:#3d4a5b;margin:70px;max-width:760px}h1{font-size:26px;font-weight:600}pre{white-space:pre-wrap;word-break:break-word;background:#e9ecf0;padding:20px;border-radius:10px;color:#7d8794;font-size:12px}</style><h1>M175 Studio could not start</h1><p>The scan engine did not become ready. Quit the app, move the entire M175 Studio.app into Applications and open it again.</p><p>Keep the app bundle intact. Detailed errors are recorded in:</p><pre>~/Library/Logs/M175 Studio/engine.log</pre><p>If macOS cannot verify the developer, review the exact message in System Settings > Privacy & Security.</p>" baseURL:nil];
 }
 - (void)applicationDidFinishLaunching:(NSNotification*)note{
     [self installMenu];
@@ -79,7 +79,7 @@ static NSString *JSString(NSString *s){
     web=[[WKWebView alloc] initWithFrame:frame configuration:config];
     [web setAutoresizingMask:(2|16)];[web setNavigationDelegate:self];[web setAllowsBackForwardNavigationGestures:NO];[web setAllowsLinkPreview:NO];
     [window setContentView:web];
-    [web loadHTMLString:@"<!doctype html><meta charset='utf-8'><style>body{margin:0;height:100vh;display:grid;place-items:center;background:#f7f8f5;font:13px -apple-system,sans-serif;color:#78906d;text-align:center}h1{font-size:25px;color:#356848;font-weight:600}p{margin-top:18px}</style><div><h1>M175 Studio</h1><p>Starting the scan workspace...</p></div>" baseURL:nil];
+    [web loadHTMLString:@"<!doctype html><meta charset='utf-8'><style>body{margin:0;height:100vh;display:grid;place-items:center;background:#f5f6f8;font:13px -apple-system,sans-serif;color:#6d7c90;text-align:center}h1{font-size:25px;color:#354a68;font-weight:600}p{margin-top:18px}</style><div><h1>M175 Studio</h1><p>Starting the scan workspace...</p></div>" baseURL:nil];
     [window makeKeyAndOrderFront:nil];[[NSApplication sharedApplication] activateIgnoringOtherApps:YES];
     NSFileManager *fm=[NSFileManager defaultManager];
     NSDictionary *privateDir=[NSDictionary dictionaryWithObject:[NSNumber numberWithUnsignedLong:0700] forKey:NSFilePosixPermissions];
