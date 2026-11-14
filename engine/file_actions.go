@@ -83,13 +83,12 @@ func (a *appServer) fileActionSelection(ids []string) ([]Document, []string, err
 	}
 	return docs, dirs, nil
 }
-func (a *appServer) copyDocument(id string) error { return a.copyDocuments([]string{id}) }
-func (a *appServer) copyDocuments(ids []string) error {
+func (a *appServer) documentCopyPaths(ids []string) ([]string, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	docs, dirs, err := a.fileActionSelection(ids)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	paths := []string{}
 	for i, doc := range docs {
@@ -98,25 +97,26 @@ func (a *appServer) copyDocuments(ids []string) error {
 			names = []string{doc.PDF}
 		}
 		if len(names) == 0 {
-			return errors.New("This document has no files to copy")
+			return nil, errors.New("This document has no files to copy")
 		}
 		for _, name := range names {
 			if name == "" || filepath.Base(name) != name {
-				return errors.New("Invalid document file")
+				return nil, errors.New("Invalid document file")
 			}
 			path := filepath.Join(dirs[i], name)
 			st, err := os.Lstat(path)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			if !st.Mode().IsRegular() {
-				return errors.New("Invalid document file")
+				return nil, errors.New("Invalid document file")
 			}
 			paths = append(paths, path)
 		}
 	}
-	// One write publishes the full batch; per-document writes would replace it.
-	return a.performFileAction("copy-files", paths)
+	// The native GUI owns the clipboard. A child helper can report success while
+	// leaving the GUI session clipboard empty; this endpoint only validates paths.
+	return paths, nil
 }
 
 type TrashResult struct {

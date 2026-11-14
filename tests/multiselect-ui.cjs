@@ -18,13 +18,22 @@ let browser;let stderr='';proc.stderr.on('data',b=>stderr+=b);
  browser=await chromium.launch({headless:true,executablePath:process.env.M175_TEST_BROWSER||undefined});
  const page=await browser.newPage({viewport:{width:1120,height:790}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
  let copies=[],trash=[],failID='';
- await page.route('**/api/copy-files',async route=>{copies.push(route.request().postDataJSON());await route.fulfill({json:{ok:true}});});
+ await page.route('**/api/copy-files',async route=>{copies.push(route.request().postDataJSON());await route.fulfill({response:await route.fetch()});});
  await page.route('**/api/trash',async route=>{
   const body=route.request().postDataJSON();trash.push(body);assert.equal(body.confirmed,true);
   const moved=[],failed={};
   for(const id of body.ids||[body.id]){if(id===failID){failed[id]='Test permission denied';continue;}fs.renameSync(path.join(output,id),path.join(temp,'trashed-'+id));moved.push(id);}
   await fetch(url+'api/refresh',{method:'POST',headers:{'X-M175-Request':'1'},body:'{}'});
   await route.fulfill({json:{moved,failed}});
+ });
+ await page.addInitScript(()=>{
+  window.testClipboardMessages=[];
+  window.webkit={messageHandlers:{studio:{postMessage(message){
+    if(message.action!=='copyFiles')return;
+    window.testClipboardMessages.push(message);
+    if(window.testClipboardMode==='timeout')return;
+    setTimeout(()=>window.studioFilesCopied(message.requestID,window.testClipboardMode==='error'?'Clipboard unavailable':''),25);
+  }}}};
  });
  await page.goto(url);await page.waitForFunction(()=>document.getElementById('docCount').textContent==='5');await page.locator('#tab-files').click();
  const rows=page.locator('.document-item'),active=page.locator('.document-item[aria-pressed="true"]');

@@ -1,4 +1,4 @@
-M175 Studio 0.3.4 - English revision
+M175 Studio 0.3.7 - Clipboard fix
 
 1. Quit any running copy of M175 Studio.
 2. Move the entire M175 Studio.app to Applications, replacing the old copy if asked.
@@ -31,3 +31,7 @@ address have separate lines. See RELEASE_NOTES_0.3.3.md.
 
 0.3.4: Replace the green workspace theme with navy accents and cool gray
 backgrounds. Layout and scanning behavior stay unchanged.
+
+0.3.7: File copying now writes through the native app and confirms the clipboard
+contains the selected files before showing success. Supports single/batch PDFs
+and original JPEG pages; Finder paste is verified on Apple Silicon.

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http/httptest"
 	"os"
@@ -20,27 +21,35 @@ func fileActionFixture(t *testing.T) *appServer {
 	return a
 }
 
+func copyDocumentForTest(a *appServer, id string) error {
+	_, err := a.documentCopyPaths([]string{id})
+	return err
+}
+func copyDocumentsForTest(a *appServer, ids []string) error {
+	_, err := a.documentCopyPaths(ids)
+	return err
+}
 func TestCopyDocumentFiles(t *testing.T) {
 	a := fileActionFixture(t)
-	var action string
-	var paths []string
-	a.fileAction = func(op string, p []string) error { action = op; paths = p; return nil }
+	a.fileAction = func(string, []string) error { t.Fatal("copy must use GUI bridge, not helper"); return nil }
 	d, err := a.renameDocument("scan-old", "研究 Report")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = a.copyDocument(d.ID); err != nil {
+	paths, err := a.documentCopyPaths([]string{d.ID})
+	if err != nil {
 		t.Fatal(err)
 	}
-	if action != "copy-files" || !reflect.DeepEqual(paths, []string{filepath.Join(a.settings.Output, d.ID, "研究 Report.pdf")}) {
-		t.Fatal(action, paths)
+	if !reflect.DeepEqual(paths, []string{filepath.Join(a.settings.Output, d.ID, "研究 Report.pdf")}) {
+		t.Fatal(paths)
 	}
 	// JPEG-only scans copy all original pages, in page order.
 	dir := filepath.Join(a.settings.Output, "scan-another")
 	os.Remove(filepath.Join(dir, "old.pdf"))
 	os.WriteFile(filepath.Join(dir, "page-002.jpg"), sampleJPEG(t), 0600)
 	a.docs = listDocuments(a.settings.Output)
-	if err = a.copyDocument("scan-another"); err != nil {
+	paths, err = a.documentCopyPaths([]string{"scan-another"})
+	if err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(paths, []string{filepath.Join(dir, "page-001.jpg"), filepath.Join(dir, "page-002.jpg")}) {
@@ -89,12 +98,12 @@ func TestFileActionsRejectUnsafeOrBusyTargets(t *testing.T) {
 	a := fileActionFixture(t)
 	a.fileAction = func(string, []string) error { t.Fatal("unsafe helper invocation"); return nil }
 	for _, id := range []string{"", "../scan-old", "scan-missing", ".", "scan-old/../scan-another"} {
-		if a.copyDocument(id) == nil || a.trashDocument(id, true) == nil {
+		if copyDocumentForTest(a, id) == nil || a.trashDocument(id, true) == nil {
 			t.Fatal("accepted", id)
 		}
 	}
 	a.job.Busy = true
-	if a.copyDocument("scan-old") == nil || a.trashDocument("scan-old", true) == nil {
+	if copyDocumentForTest(a, "scan-old") == nil || a.trashDocument("scan-old", true) == nil {
 		t.Fatal("busy mutation accepted")
 	}
 	a.job.Busy = false
@@ -103,28 +112,28 @@ func TestFileActionsRejectUnsafeOrBusyTargets(t *testing.T) {
 	moved := filepath.Join(t.TempDir(), "scan-old")
 	os.Rename(dir, moved)
 	os.Symlink(moved, dir)
-	if a.copyDocument("scan-old") == nil || a.trashDocument("scan-old", true) == nil {
+	if copyDocumentForTest(a, "scan-old") == nil || a.trashDocument("scan-old", true) == nil {
 		t.Fatal("symlink directory accepted")
 	}
 	file := filepath.Join(a.settings.Output, "scan-another", "old.pdf")
 	os.Remove(file)
 	os.Symlink(filepath.Join(moved, "old.pdf"), file)
-	if a.copyDocument("scan-another") == nil {
+	if copyDocumentForTest(a, "scan-another") == nil {
 		t.Fatal("symlink asset accepted")
 	}
 }
 func TestFileActionFailurePreservesHistory(t *testing.T) {
 	a := fileActionFixture(t)
 	a.fileAction = func(string, []string) error { return errors.New("Trash unavailable") }
-	if a.trashDocument("scan-old", true) == nil || a.copyDocument("scan-old") == nil {
+	if a.trashDocument("scan-old", true) == nil {
 		t.Fatal("failed operation reported success")
 	}
 	if len(a.docs) != 2 || len(listDocuments(a.settings.Output)) != 2 {
 		t.Fatal("history lost")
 	}
 	a.fileAction = nil
-	if a.copyDocument("scan-old") == nil || a.trashDocument("scan-old", true) == nil {
-		t.Fatal("missing native helper accepted")
+	if copyDocumentForTest(a, "scan-old") != nil || a.trashDocument("scan-old", true) == nil {
+		t.Fatal("copy should prepare paths without a helper; Trash still requires it")
 	}
 }
 func TestFileActionHTTPGuards(t *testing.T) {
@@ -153,9 +162,17 @@ func TestFileActionHTTPGuards(t *testing.T) {
 		if w.Code != tc.want {
 			t.Fatalf("%+v: %d %s", tc, w.Code, w.Body.String())
 		}
+		if tc.path == "copy-files" && w.Code == 200 {
+			var result struct {
+				Paths []string `json:"paths"`
+			}
+			if err := json.Unmarshal(w.Body.Bytes(), &result); err != nil || !reflect.DeepEqual(result.Paths, []string{filepath.Join(a.settings.Output, "scan-old", "old.pdf")}) {
+				t.Fatal(w.Body.String(), err)
+			}
+		}
 	}
-	if calls != 1 {
-		t.Fatal("unguarded file operation", calls)
+	if calls != 0 {
+		t.Fatal("copy preparation invoked a helper", calls)
 	}
 }
 
@@ -165,20 +182,11 @@ func TestBatchCopyMixedFormatsAndDedupe(t *testing.T) {
 	os.Remove(filepath.Join(dir, "old.pdf"))
 	os.WriteFile(filepath.Join(dir, "page-002.jpg"), sampleJPEG(t), 0600)
 	a.docs = listDocuments(a.settings.Output)
-	calls := 0
-	a.fileAction = func(action string, paths []string) error {
-		calls++
-		want := []string{filepath.Join(a.settings.Output, "scan-old", "old.pdf"), filepath.Join(dir, "page-001.jpg"), filepath.Join(dir, "page-002.jpg")}
-		if action != "copy-files" || !reflect.DeepEqual(paths, want) {
-			t.Fatal(action, paths)
-		}
-		return nil
-	}
-	if err := a.copyDocuments([]string{"scan-old", "scan-another", "scan-old"}); err != nil {
-		t.Fatal(err)
-	}
-	if calls != 1 {
-		t.Fatal("clipboard replaced instead of one batch", calls)
+	a.fileAction = func(string, []string) error { t.Fatal("copy invoked helper"); return nil }
+	paths, err := a.documentCopyPaths([]string{"scan-old", "scan-another", "scan-old"})
+	want := []string{filepath.Join(a.settings.Output, "scan-old", "old.pdf"), filepath.Join(dir, "page-001.jpg"), filepath.Join(dir, "page-002.jpg")}
+	if err != nil || !reflect.DeepEqual(paths, want) {
+		t.Fatal(paths, err)
 	}
 }
 func TestBatchPreflightAndConfirmation(t *testing.T) {
@@ -186,7 +194,7 @@ func TestBatchPreflightAndConfirmation(t *testing.T) {
 	calls := 0
 	a.fileAction = func(string, []string) error { calls++; return nil }
 	for _, ids := range [][]string{nil, {}, {"scan-old", "scan-missing"}, {"scan-old", "../bad"}, make([]string, 201)} {
-		if a.copyDocuments(ids) == nil {
+		if copyDocumentsForTest(a, ids) == nil {
 			t.Fatal("invalid copy accepted", ids)
 		}
 		if _, err := a.trashDocuments(ids, true); err == nil {
@@ -197,7 +205,7 @@ func TestBatchPreflightAndConfirmation(t *testing.T) {
 		t.Fatal("unconfirmed batch")
 	}
 	a.job.Busy = true
-	if a.copyDocuments([]string{"scan-old", "scan-another"}) == nil {
+	if copyDocumentsForTest(a, []string{"scan-old", "scan-another"}) == nil {
 		t.Fatal("copy while busy")
 	}
 	if _, err := a.trashDocuments([]string{"scan-old", "scan-another"}, true); err == nil {

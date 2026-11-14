@@ -576,31 +576,31 @@ func (a *appServer) route(w http.ResponseWriter, r *http.Request) {
 				fail(w, 400, errors.New("Use either id or ids"))
 				return
 			}
-			if req.IDs != nil {
-				if rel == "api/trash" {
-					result, e := a.trashDocuments(req.IDs, req.Confirmed)
-					if e != nil {
-						fail(w, 409, e)
-						return
-					}
-					jsonOut(w, result)
-					return
+			if rel == "api/copy-files" {
+				ids := req.IDs
+				if ids == nil {
+					ids = []string{req.ID}
 				}
-				if e := a.copyDocuments(req.IDs); e != nil {
-					fail(w, 409, e)
-					return
-				}
-			} else {
-				var e error
-				if rel == "api/trash" {
-					e = a.trashDocument(req.ID, req.Confirmed)
-				} else {
-					e = a.copyDocument(req.ID)
-				}
+				paths, e := a.documentCopyPaths(ids)
 				if e != nil {
 					fail(w, 409, e)
 					return
 				}
+				jsonOut(w, map[string]interface{}{"paths": paths})
+				return
+			}
+			if req.IDs != nil {
+				result, e := a.trashDocuments(req.IDs, req.Confirmed)
+				if e != nil {
+					fail(w, 409, e)
+					return
+				}
+				jsonOut(w, result)
+				return
+			}
+			if e := a.trashDocument(req.ID, req.Confirmed); e != nil {
+				fail(w, 409, e)
+				return
 			}
 			jsonOut(w, map[string]bool{"ok": true})
 			return

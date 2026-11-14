@@ -16,6 +16,8 @@ int main(void){@autoreleasepool{
  CHECK(StudioCopyFiles(@[jpeg,second],board,&error));
  urls=[board readObjectsForClasses:@[[NSURL class]] options:@{NSPasteboardURLReadingFileURLsOnlyKey:@YES}];CHECK([urls count]==2);
  CHECK(!StudioCopyFiles(@[dir],board,&error));CHECK(!StudioCopyFiles(@[],board,&error));
+ CHECK(!StudioCopyFiles((NSArray*)@"not-an-array",board,&error));CHECK(!StudioCopyFiles(@[@42],board,&error));
+ CHECK([[board readObjectsForClasses:@[[NSURL class]] options:@{NSPasteboardURLReadingFileURLsOnlyKey:@YES}] count]==2);
  CHECK(!StudioTrashFolder(pdf,NULL,&error));
  NSString *link=[root stringByAppendingPathComponent:@"scan-symlink"];CHECK([fm createSymbolicLinkAtPath:link withDestinationPath:dir error:&error]);CHECK(!StudioTrashFolder(link,NULL,&error));
  NSURL *trashed=nil;CHECK(StudioTrashFolder(dir,&trashed,&error));CHECK(trashed!=nil);CHECK(![fm fileExistsAtPath:dir]);

@@ -5,9 +5,10 @@ static BOOL InvalidFile(NSError **error, NSString *message) {
     return NO;
 }
 BOOL StudioCopyFiles(NSArray *paths, NSPasteboard *pasteboard, NSError **error) {
-    if(![paths count])return InvalidFile(error,@"No files selected");
+    if(![paths isKindOfClass:[NSArray class]]||![paths count])return InvalidFile(error,@"No files selected");
     NSMutableArray *urls=[NSMutableArray array];
     for(NSString *path in paths){
+        if(![path isKindOfClass:[NSString class]])return InvalidFile(error,@"Invalid file selection");
         NSDictionary *attrs=[[NSFileManager defaultManager] attributesOfItemAtPath:path error:error];
         if(![path isAbsolutePath]||![[attrs objectForKey:NSFileType] isEqualToString:NSFileTypeRegular])return InvalidFile(error,@"The selected file is unavailable");
         [urls addObject:[NSURL fileURLWithPath:path]];
@@ -16,6 +17,8 @@ BOOL StudioCopyFiles(NSArray *paths, NSPasteboard *pasteboard, NSError **error) 
     // paste the actual files rather than receiving plain-text filesystem paths.
     [pasteboard clearContents];
     if(![pasteboard writeObjects:urls])return InvalidFile(error,@"Could not copy files to the clipboard");
+    NSArray *copied=[pasteboard readObjectsForClasses:@[[NSURL class]] options:@{NSPasteboardURLReadingFileURLsOnlyKey:@YES}];
+    if(![copied isEqualToArray:urls])return InvalidFile(error,@"The clipboard did not retain the selected files. Please try again");
     return YES;
 }
 BOOL StudioTrashFolder(NSString *path, NSURL **result, NSError **error) {

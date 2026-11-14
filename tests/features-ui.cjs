@@ -16,7 +16,16 @@ let stderr='';proc.stderr.on('data',b=>stderr+=b);let browser;
  for(let i=0;i<100&&!fs.existsSync(ready);i++)await new Promise(r=>setTimeout(r,100));
  assert(fs.existsSync(ready),stderr);const url=JSON.parse(fs.readFileSync(ready)).url;
  browser=await chromium.launch({headless:true,executablePath:process.env.M175_TEST_BROWSER||undefined});const page=await browser.newPage({viewport:{width:1120,height:790}}),errors=[];
- page.on('pageerror',e=>errors.push(e.message));await page.goto(url);await page.waitForFunction(()=>document.getElementById('previewTitle').textContent.includes('Scan'));
+ page.on('pageerror',e=>errors.push(e.message));await page.addInitScript(()=>{
+  window.testClipboardMessages=[];
+  window.webkit={messageHandlers:{studio:{postMessage(message){
+    if(message.action!=='copyFiles')return;
+    window.testClipboardMessages.push(message);
+    if(window.testClipboardMode==='timeout')return;
+    setTimeout(()=>window.studioFilesCopied(message.requestID,window.testClipboardMode==='error'?'Clipboard unavailable':''),25);
+  }}}};
+ });
+ await page.goto(url);await page.waitForFunction(()=>document.getElementById('previewTitle').textContent.includes('Scan'));
  const title=page.locator('#previewTitle'),input=page.locator('#titleEdit');
  async function rename(text,key='Enter'){
   const before=await title.innerText();await title.click();await input.fill(text);
@@ -112,7 +121,7 @@ let stderr='';proc.stderr.on('data',b=>stderr+=b);let browser;
  await page.setViewportSize({width:1120,height:790});
  await page.locator('#tab-files').click();
  let copies=[],trashRequests=[],trashFails=true;
- await page.route('**/api/copy-files',async route=>{copies.push(route.request().postDataJSON());await route.fulfill({json:{ok:true}});});
+ await page.route('**/api/copy-files',async route=>{copies.push(route.request().postDataJSON());await route.fulfill({response:await route.fetch()});});
  await page.route('**/api/trash',async route=>{
   const body=route.request().postDataJSON();trashRequests.push(body);
   if(trashFails){await route.fulfill({status:409,json:{error:'Test: Trash unavailable'}});return;}
@@ -147,6 +156,21 @@ let stderr='';proc.stderr.on('data',b=>stderr+=b);let browser;
  await page.locator('#trashFile').click();await page.keyboard.press('Tab');assert(await page.locator('#confirmTrash').evaluate(el=>el===document.activeElement));await page.keyboard.press('Tab');assert(await page.locator('#cancelTrash').evaluate(el=>el===document.activeElement));
  await page.locator('#confirmTrash').click();await page.waitForFunction(()=>document.getElementById('trashError').textContent.includes('unavailable'));assert.equal(await rows.count(),2);assert(fs.existsSync(path.join(output,'scan-two')));
  await page.screenshot({path:path.join(shot,'08-trash-confirmation.png')});await page.locator('#cancelTrash').click();
+ // A successful preparation response is not a successful clipboard write.
+ await page.evaluate(()=>window.testClipboardMode='error');
+ await page.locator('#copyFile').click();await page.waitForFunction(()=>document.getElementById('toast').textContent==='Copy failed: Clipboard unavailable');
+ await page.evaluate(()=>window.testClipboardMode='timeout');
+ await page.locator('#copyFile').click();await page.waitForTimeout(200);
+ assert(await page.locator('#copyFile').isDisabled());
+ assert(!(await page.locator('#toast').innerText()).includes('PDF copied'));
+ await page.waitForFunction(()=>document.getElementById('toast').textContent.includes('did not confirm'));
+ assert(!(await page.locator('#copyFile').isDisabled()));
+ // A late acknowledgment cannot turn a timed-out request into success.
+ await page.evaluate(()=>window.studioFilesCopied(window.testClipboardMessages.at(-1).requestID,''));
+ assert((await page.locator('#toast').innerText()).includes('did not confirm'));
+ await page.evaluate(()=>window.testClipboardMode='');
+ await page.locator('#copyFile').click();await page.waitForFunction(()=>document.getElementById('toast').textContent.startsWith('PDF copied'));
+ assert((await page.evaluate(()=>window.testClipboardMessages.at(-1).paths)).every(p=>p.endsWith('.pdf')));
  // Failed copy reports an error rather than falsely claiming clipboard success.
  await page.unroute('**/api/copy-files');await page.route('**/api/copy-files',route=>route.fulfill({status:409,json:{error:'Test: clipboard unavailable'}}));
  await page.locator('#copyFile').click();await page.waitForFunction(()=>document.getElementById('toast').textContent.includes('Copy failed'));

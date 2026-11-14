@@ -137,6 +137,15 @@ static NSString *JSString(NSString *s){
     id body=[message body];if(![body isKindOfClass:[NSDictionary class]])return;
     NSString *action=[body objectForKey:@"action"];if(![action isKindOfClass:[NSString class]])return;
     if([action isEqualToString:@"busy"]){id b=[body objectForKey:@"busy"];if([b isKindOfClass:[NSNumber class]])busy=[b boolValue];return;}
+    if([action isEqualToString:@"copyFiles"]){
+        NSString *requestID=[body objectForKey:@"requestID"];
+        if(![requestID isKindOfClass:[NSString class]]||[requestID length]>64)return;
+        NSError *error=nil;
+        BOOL ok=!busy&&StudioCopyFiles([body objectForKey:@"paths"],[NSPasteboard generalPasteboard],&error);
+        NSString *failure=ok?@"":(busy?@"Wait for the current scan before copying files":([error localizedDescription]?:@"Could not copy files"));
+        [web evaluateJavaScript:[NSString stringWithFormat:@"window.studioFilesCopied(%@,%@)",JSString(requestID),JSString(failure)] completionHandler:nil];
+        return;
+    }
     if([action isEqualToString:@"copy"]){
         NSString *text=[body objectForKey:@"text"];if([text isKindOfClass:[NSString class]]&&[text length]<1048576){NSPasteboard *pb=[NSPasteboard generalPasteboard];[pb clearContents];[pb setString:text forType:NSPasteboardTypeString];}return;
     }

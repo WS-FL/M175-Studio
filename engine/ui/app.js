@@ -207,10 +207,27 @@ function showFileMenu(x,y){
   menu.querySelector('[data-file-action="trash"]').firstChild.textContent=count>1?'Move '+count+' to Trash… ':'Move to Trash… ';
   menu.querySelector('button:not(:disabled)').focus();
 }
+let copyRequestSequence = 0;
+const pendingFileCopies = new Map();
+window.studioFilesCopied = (requestID, error) => {
+  const pending=pendingFileCopies.get(requestID);if(!pending)return;
+  pendingFileCopies.delete(requestID);clearTimeout(pending.timer);
+  if(error)pending.reject(new Error(String(error)));else pending.resolve();
+};
+function copyFilesToSystemClipboard(paths){
+  return new Promise((resolve,reject)=>{
+    const requestID=String(++copyRequestSequence);
+    const timer=setTimeout(()=>window.studioFilesCopied(requestID,'The Mac app did not confirm the clipboard write. Please try again.'),5000);
+    pendingFileCopies.set(requestID,{resolve,reject,timer});
+    try{
+      if(!native('copyFiles',{requestID,paths}))window.studioFilesCopied(requestID,'Open the installed Mac app to copy files.');
+    }catch(e){window.studioFilesCopied(requestID,e.message);}
+  });
+}
 async function copyDocument(){
   const docs=selectedDocuments();if(!docs.length||appState?.job?.busy||fileActionBusy||trashTarget)return;
   fileActionBusy=true;renderFiles();
-  try{await api('copy-files',selectionPayload(docs));toast(docs.length>1?docs.length+' documents copied. Paste them in Finder or another app.':docs[0].pdf?'PDF copied. Paste it in Finder or another app.':'Original images copied. Paste them in Finder or another app.');}
+  try{const result=await api('copy-files',selectionPayload(docs));await copyFilesToSystemClipboard(result.paths);toast(docs.length>1?docs.length+' documents copied. Paste them in Finder or another app.':docs[0].pdf?'PDF copied. Paste it in Finder or another app.':'Original images copied. Paste them in Finder or another app.');}
   catch(e){toast('Copy failed: '+e.message,true);}
   finally{fileActionBusy=false;renderFiles();}
 }
